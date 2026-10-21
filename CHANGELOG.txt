@@ -1,0 +1,30 @@
+v1.1.0
+
+- Profiles: sc day / night / movie, or save your own (sc profile save gaming)
+- Nicknames: sc name #2 Gaming; follow the monitor across ports
+- Shortcut: Ctrl+Alt+Shift+C opens sc (installer option --hotkey, rebindable in Flow)
+- Windows HDR switch at the top of sc hdr (all screens at once, like Win+Alt+B)
+- Shift+Enter quick actions: brightness/contrast presets, HDR, identify
+- sc ? lists every command; sc shows a command menu
+- Half-typed commands suggest how to finish them instead of showing an error
+- Readable in light and dark themes: accessible screen colours (white digits >= 4.8:1),
+  no text drawn over value bars, theme-coloured icons, identify overlay follows Windows mode
+- Clearer DDC/CI errors (stuck monitor, unsupported setting, Remote Desktop...)
+- Faster: ~90 ms Flow startup, instant queries from cache, screens re-read in the background every 30 s
+- Self-healing: a supervisor restarts the plugin after a crash or hang and
+  always answers Flow; sc reset (and Enter on error rows) resets everything
+- Value bars show the current % inside them
+- Fix: crash when Flow cancelled a query while typing
+- Fix: plugin process spinning after Flow closed it (flogin read loop)
+
+v1.0.0
+
+- Brightness and contrast per screen or for all screens, absolute (sc 50) or relative (sc +10)
+- HDR on/off/toggle per screen, or for all screens at once (sc hdr, sc hdr on)
+- Identify screens: a big coloured number is shown on each screen (sc id),
+  matching the numbered icon in Flow
+- Screens are numbered left to right and described by position, primary,
+  size, resolution, refresh rate, connection and serial number
+- Target a screen by number, name, brand, position or connection (sc #2 80, sc lg 40)
+- No network access or runtime installation; no compiled dependencies
+- Hardware access on a background thread with timeouts, retries and caching

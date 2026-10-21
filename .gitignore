@@ -1,0 +1,40 @@
+# Build output and bundled dependencies (CI recreates lib/ from requirements.txt)
+lib/
+*.zip
+dist/
+build/
+release/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+venv/
+.venv/
+env/
+
+# Plugin runtime files: logs, debug switch, saved nicknames/profiles
+*.log
+*.log.*
+debug.flag
+data/
+screen_control.json
+*.bad.json
+*.tmp
+
+# Secrets and local configuration
+.env
+.env.*
+*.pem
+*.key
+*.pfx
+.claude/
+.vscode/
+.idea/
+*.code-workspace
+
+# Windows
+Thumbs.db
+desktop.ini

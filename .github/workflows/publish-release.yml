@@ -1,0 +1,73 @@
+# Build, test and publish a GitHub release whenever the version in plugin.json
+# changes (Flow Launcher's plugin manifest requires an automated release, and
+# its updater picks new releases up by itself every few hours).
+name: Publish Release
+
+on:
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - ".github/workflows/**"
+      - "**.md"
+  pull_request:
+  workflow_dispatch:
+
+env:
+  # Flow Launcher's embedded Python is 3.11; lib/ only holds pure-Python wheels anyway.
+  python_ver: "3.11"
+  zip_name: Flow.Launcher.Plugin.ScreenControl.zip
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.python_ver }}
+
+      - name: Read version
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Get-Content plugin.json -Raw | ConvertFrom-Json).Version
+          "version=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Version $version"
+
+      - name: Bundle dependencies into lib/
+        run: python build_plugin.py install-lib
+
+      - name: Run tests
+        run: python -m unittest discover -s tests -t .
+
+      - name: Build and check the archive
+        run: python build_plugin.py ${{ env.zip_name }}
+
+      - name: Upload the archive to the workflow run
+        uses: actions/upload-artifact@v4
+        with:
+          name: ScreenControl-${{ steps.version.outputs.version }}
+          path: ${{ env.zip_name }}
+
+      - name: Is this version already released?
+        id: released
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "v${{ steps.version.outputs.version }}" --repo "${{ github.repository }}" *> $null
+          "exists=$($LASTEXITCODE -eq 0)".ToLower() >> $env:GITHUB_OUTPUT
+          $global:LASTEXITCODE = 0
+
+      - name: Publish the release
+        if: github.event_name != 'pull_request' && steps.released.outputs.exists != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: ScreenControl ${{ steps.version.outputs.version }}
+          body_path: CHANGELOG.txt
+          files: ${{ env.zip_name }}

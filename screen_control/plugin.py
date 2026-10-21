@@ -1,0 +1,198 @@
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import sys
+import threading
+from pathlib import Path
+from typing import Any
+
+from flogin import ErrorResponse, ExecuteResponse, Plugin, Query, QueryResponse, Result, SearchHandler
+
+from .query_parser import parse_query
+from .screens import ScreenService
+from .store import Store, data_dir
+from .views import build_results, error_result, reset_result
+from .win32 import Win32Error
+
+__all__ = ("ScreenControlPlugin",)
+
+log = logging.getLogger(__name__)
+
+
+class ScreenSearchHandler(SearchHandler["ScreenControlPlugin"]):
+    """Single entry point: every query is parsed and turned into results."""
+
+    async def callback(self, query: Query[Any]) -> list[Result]:
+        assert self.plugin is not None
+        parsed = parse_query(query.text)
+        try:
+            screens = await self.plugin.service.screens()
+        except Win32Error as e:
+            log.warning("Could not read screens: %s", e)
+            return [reset_result("Could not read your screens", e.message)]
+        store = self.plugin.store
+        profiles = store.profiles()
+        customized = frozenset(n for n in profiles if store.is_customized(n))
+        return build_results(parsed, screens, query.keyword, profiles, customized)
+
+    async def on_error(self, query: Query[Any], error: Exception) -> list[Result]:
+        # Show the problem in Flow instead of returning a JSON-RPC error,
+        # which Flow reports as a plugin crash.
+        log.exception("Search failed for %r", query.text, exc_info=error)
+        return [
+            reset_result(
+                "ScreenControl hit an unexpected error",
+                f"{type(error).__name__}: {error} — details in screen_control.log",
+            )
+        ]
+
+
+class ScreenControlPlugin(Plugin):
+    def __init__(self) -> None:
+        super().__init__(
+            # We configure logging ourselves (see main.py).
+            disable_log_override_files=True,
+            # Flow cancels the previous query on every keystroke. flogin turns a
+            # cancelled search into ``None`` and then crashes serialising it, so
+            # Flow never gets an answer. Queries are cheap (cached, and hardware
+            # reads are coalesced), so just let them finish.
+            ignore_cancellation_requests=True,
+        )
+        self.store = Store(data_dir(Path(__file__).resolve().parent.parent))
+        self.service = ScreenService()
+        self.service.nickname_for = self.store.nickname
+        self.register_search_handler(ScreenSearchHandler())
+        self.register_event(self._warm_up, "on_initialization")
+        self.register_event(self._on_close, "on_close")  # Flow sends "close" when it exits
+
+    async def _on_close(self, *_: Any) -> ExecuteResponse:
+        self.service.close()
+        return ExecuteResponse(hide=False)
+
+    async def start(self) -> None:
+        """Replaces flogin's loop, which spins forever once Flow closes the pipe and
+        leaves a request unanswered when handling it raises. Standard library only
+        (flogin's version needs aioconsole, which is GPL)."""
+        reader = _StdinLines(asyncio.get_running_loop())
+        self.jsonrpc.reader, self.jsonrpc.writer = reader, _StdoutWriter()  # type: ignore[assignment]
+        tasks: set[asyncio.Task[None]] = set()
+        async for raw in reader:
+            line = raw.decode("utf-8", errors="replace").strip()
+            if not line:
+                continue
+            task = asyncio.create_task(self._process_safely(line))
+            tasks.add(task)
+            task.add_done_callback(tasks.discard)
+        log.info("Flow closed the connection, stopping")
+        self.service.close()
+
+    async def _process_safely(self, line: str) -> None:
+        try:
+            await self.jsonrpc.process_input(line)
+        except Exception as error:
+            log.exception("Could not handle message from Flow: %.300s", line)
+            try:
+                msg = json.loads(line)
+            except ValueError:
+                return  # not JSON: there is nothing to answer
+            if not (isinstance(msg, dict) and "id" in msg and "method" in msg):
+                return
+            # Always answer, so Flow never waits on a request.
+            response: QueryResponse | ExecuteResponse
+            if msg["method"] == "query":
+                response = QueryResponse(
+                    [error_result("ScreenControl hit an unexpected error", f"{type(error).__name__}: {error}")]
+                )
+            elif msg["method"] == "context_menu":
+                response = QueryResponse([])
+            else:
+                response = ExecuteResponse(hide=False)
+            try:
+                await self.jsonrpc.write(response.to_message(id=msg["id"]))
+            except Exception:
+                log.exception("Could not send the error answer")
+
+    def process_action(self, method: str) -> asyncio.Task[ExecuteResponse] | None:
+        task = super().process_action(method)
+        if task is None and method.startswith("flogin.action."):
+            # A result from an older list (e.g. a submenu opened before the last
+            # keystroke): flogin would answer with an error. Do nothing, quietly.
+            log.info("Ignored action from an outdated result list")
+            return asyncio.create_task(_stay_open())
+        return task
+
+    async def _warm_up(self) -> None:
+        # Read the screens while Flow finishes starting, so the first `sc` is instant.
+        self.service.warm_up()
+
+    async def process_search_handlers(self, query: Query[Any]) -> QueryResponse | ErrorResponse:
+        response = await super().process_search_handlers(query)
+        # Belt and braces for the flogin bug above: never send a None result list.
+        if isinstance(response, QueryResponse) and response.results is None:
+            response.results = []
+        return response
+
+    async def process_context_menus(self, data: list[Any]) -> QueryResponse | ErrorResponse:
+        response = await super().process_context_menus(data)
+        if isinstance(response, QueryResponse) and response.results is None:
+            response.results = []
+        return response
+
+
+async def _stay_open() -> ExecuteResponse:
+    return ExecuteResponse(hide=False)
+
+
+class _StdinLines:
+    """Flow's messages, one line each, read on a thread.
+
+    Flow's pipes are anonymous (not overlapped), which asyncio's Windows event
+    loop cannot read directly.
+    """
+
+    def __init__(self, loop: asyncio.AbstractEventLoop) -> None:
+        self._loop = loop
+        self._lines: asyncio.Queue[bytes | None] = asyncio.Queue()
+        threading.Thread(target=self._pump, name="flow-stdin", daemon=True).start()
+
+    def _push(self, item: bytes | None) -> None:
+        try:
+            self._loop.call_soon_threadsafe(self._lines.put_nowait, item)
+        except RuntimeError:
+            pass  # the loop is already closed: we are shutting down
+
+    def _pump(self) -> None:
+        try:
+            for line in sys.stdin.buffer:
+                self._push(line)
+        except (OSError, ValueError, AttributeError):
+            log.exception("Reading from Flow failed")
+        finally:
+            self._push(None)  # end of input
+
+    def __aiter__(self) -> _StdinLines:
+        return self
+
+    async def __anext__(self) -> bytes:
+        line = await self._lines.get()
+        if line is None:
+            raise StopAsyncIteration
+        return line
+
+
+class _StdoutWriter:
+    """What flogin's JSON-RPC client needs from a stream writer."""
+
+    def __init__(self) -> None:
+        self._out = sys.stdout.buffer
+        self._lock = threading.Lock()
+
+    def write(self, data: bytes) -> None:
+        with self._lock:
+            self._out.write(data)
+            self._out.flush()
+
+    async def drain(self) -> None:
+        return None  # write() already flushed
