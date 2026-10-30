@@ -46,7 +46,7 @@ pm install ScreenControl
 Install a specific release straight from Flow ([all releases](https://github.com/aalbertinib/flow-launcher-screen-control/releases)):
 
 ```
-pm install https://github.com/aalbertinib/flow-launcher-screen-control/releases/download/v1.1.0/Flow.Launcher.Plugin.ScreenControl.zip
+pm install https://github.com/aalbertinib/flow-launcher-screen-control/releases/download/v1.2.0/Flow.Launcher.Plugin.ScreenControl.zip
 ```
 
 Or by hand: extract the release zip into `%APPDATA%\FlowLauncher\Plugins\ScreenControl`
