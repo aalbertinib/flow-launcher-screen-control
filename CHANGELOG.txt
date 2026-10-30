@@ -1,4 +1,4 @@
-Unreleased
+v1.2.0
 
 - Short commands: any letters that fit a single command work (sc p, sc s, sc r, sc ni, sc p save gaming);
   when several fit (sc n) they are suggested, and a screen the letters could mean stays one row away

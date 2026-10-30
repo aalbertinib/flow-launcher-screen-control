@@ -63,11 +63,15 @@ jobs:
           "exists=$($LASTEXITCODE -eq 0)".ToLower() >> $env:GITHUB_OUTPUT
           $global:LASTEXITCODE = 0
 
+      - name: Extract this version's release notes
+        if: github.event_name != 'pull_request' && steps.released.outputs.exists != 'true'
+        run: python build_plugin.py notes ${{ steps.version.outputs.version }} release_notes.md
+
       - name: Publish the release
         if: github.event_name != 'pull_request' && steps.released.outputs.exists != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version }}
           name: ScreenControl ${{ steps.version.outputs.version }}
-          body_path: CHANGELOG.txt
+          body_path: release_notes.md
           files: ${{ env.zip_name }}
