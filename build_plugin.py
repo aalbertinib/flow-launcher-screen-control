@@ -62,6 +62,7 @@ def collect() -> list[Path]:
     files = [ROOT / "plugin.json", ROOT / "main.py", ROOT / "LICENSE", ROOT / "THIRD_PARTY_NOTICES.md"]
     files += sorted((ROOT / "assets").glob("*.png"))
     files += sorted((ROOT / "screen_control").rglob("*.py"))
+    files += sorted((ROOT / "screen_control").rglob("*.html"))  # the settings panel
     files += sorted(
         p
         for p in LIB.rglob("*")

@@ -75,7 +75,9 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(t[0], "Apply profile “night”")
         self.assertIn("Save the current settings as “night”", t)
         results = build_results(parse_query("night"), SCREENS, "sc", DEFAULT_PROFILES)
-        self.assertIn("1: ☀ 10% HDR off", results[0].sub or "")
+        self.assertIn("1: ☀ 10% HDR off", results[0].sub_tooltip or "")  # what it sets
+        self.assertIn("1: ☀ 40→10%", results[0].sub or "")  # what it changes now
+        self.assertIn("2: ☀ 40→10% HDR on→off", results[0].sub or "")
 
     def test_save_and_delete_views(self) -> None:
         self.assertEqual(titles("profile save gaming", profiles=DEFAULT_PROFILES), ["Save current settings as “gaming”"])

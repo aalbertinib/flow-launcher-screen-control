@@ -125,6 +125,18 @@ class Store:
     def is_customized(self, name: str) -> bool:
         return normalize_profile_name(name) in self._data["profiles"]
 
+    def saved_profile(self, name: str) -> dict[str, dict[str, Any]] | None:
+        """What the user saved under ``name`` (None for a default or unknown profile)."""
+        saved = self._data["profiles"].get(normalize_profile_name(name))
+        return copy.deepcopy(saved) if saved is not None else None
+
+    def restore_profile(self, name: str, saved: dict[str, dict[str, Any]] | None) -> None:
+        """Put back what :meth:`saved_profile` returned (undo of a save or delete)."""
+        if saved is None:
+            self.delete_profile(name)
+        else:
+            self.save_profile(name, saved)
+
 
 def normalize_profile_name(name: str) -> str:
     return " ".join(name.lower().split())[:_MAX_NAME]

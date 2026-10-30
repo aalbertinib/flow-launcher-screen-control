@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from flogin import Result
 
+from .feedback import Feedback
 from .identify import icon_for
 from .query_parser import Action, HdrMode, ParsedQuery
 from .results import (
@@ -14,8 +15,13 @@ from .results import (
     ICON_ERROR,
     ICON_HDR,
     ICON_IDENTIFY,
+    GLYPH_DONE,
+    GLYPH_SETTINGS,
+    GLYPH_UNDO,
     ChangeQueryResult,
     ResetResult,
+    SettingsResult,
+    UndoResult,
     HdrResult,
     IdentifyResult,
     InfoResult,
@@ -27,7 +33,7 @@ from .results import (
 )
 from .screens import Feature, Screen
 from .store import DEFAULT_PROFILES
-from .views_extra import name_view, profile_view
+from .views_extra import active_profiles, apply_summary, matching_names, name_view, profile_view
 
 __all__ = ("build_results", "error_result")
 
@@ -81,9 +87,9 @@ def _details(s: Screen) -> str:
 
 
 class _Builder:
-    def __init__(self, keyword: str) -> None:
+    def __init__(self, keyword: str, results: list[Result] | None = None) -> None:
         self.keyword = keyword
-        self.results: list[Result] = []
+        self.results: list[Result] = [] if results is None else results
 
     def q(self, text: str) -> str:
         """Full query text for Flow's search box (keyword included)."""
@@ -97,27 +103,49 @@ class _Builder:
         self.add(error_result(title, sub))
 
 
-# Command words a half-typed word may be heading to (shown instead of an error).
+# Command words a half-typed word may be heading to (shown instead of an error),
+# after the profiles it may be heading to.
 _COMPLETIONS = (
-    ("day", "Apply the day profile"),
-    ("night", "Apply the night profile"),
-    ("movie", "Apply the movie profile"),
     ("profile ", "List, apply or save profiles"),
     ("name ", "Give a screen a nickname"),
+    ("settings", "Open the settings panel: profiles, nicknames, values"),
     ("reset", "Restart monitor communication and clear caches"),
     ("help", "Every command with examples"),
 )
 
 
-def _suggest(b: _Builder, partial: str) -> bool:
+def _suggest(b: _Builder, partial: str, profiles: dict[str, dict], screens: list[Screen]) -> bool:
+    names = [n for n in profiles if n.startswith(partial) and n != partial]
+    for n in names:
+        b.add(
+            ChangeQueryResult(
+                b.q(n),
+                title=f"sc {n}",
+                sub=f"Profile · {apply_summary(profiles[n], screens)} · Enter or Tab to complete",
+                icon=ICON_ALL,
+                auto_complete_text=b.q(n),
+            )
+        )
     matches = [(word, what) for word, what in _COMPLETIONS if word.startswith(partial) and word.strip() != partial]
     for word, what in matches:
         b.add(ChangeQueryResult(b.q(word), title=f"sc {word.strip()}", sub=f"{what} · Enter or Tab to complete",
                                 icon=ICON_APP, auto_complete_text=b.q(word)))
-    return bool(matches)
+    return bool(names or matches)
 
 
-def _select(parsed: ParsedQuery, screens: list[Screen], b: _Builder) -> list[Screen] | None:
+def _feedback(b: _Builder, feedback: Feedback) -> None:
+    """The banner reporting the last action, on the list it was picked from."""
+    if feedback.can_undo:
+        sub = f"{feedback.sub} · Enter: undo" if feedback.sub else "Enter: undo"
+        b.add(UndoResult(title=f"✓ {feedback.title}", sub=sub, icon=ICON_APP, glyph=GLYPH_UNDO,
+                         title_tooltip="Enter: undo this change"))
+    else:
+        b.add(InfoResult(title=f"✓ {feedback.title}", sub=feedback.sub, icon=ICON_APP, glyph=GLYPH_DONE))
+
+
+def _select(
+    parsed: ParsedQuery, screens: list[Screen], b: _Builder, profiles: dict[str, dict]
+) -> list[Screen] | None:
     selected = screens
     if parsed.screen_number is not None:
         selected = [s for s in selected if s.number == parsed.screen_number]
@@ -128,16 +156,34 @@ def _select(parsed: ParsedQuery, screens: list[Screen], b: _Builder) -> list[Scr
     for word in parsed.filters:
         selected = [s for s in selected if word in s.search_text]
     if not selected:
-        if len(parsed.filters) == 1 and _suggest(b, parsed.filters[0]):
-            return None  # a command word being typed, not a screen name
+        if _suggest(b, " ".join(parsed.filters), profiles, screens):
+            return None  # a command word or profile name being typed, not a screen name
         names = " · ".join(s.title for s in screens)
         b.error(f"No screen matches “{' '.join(parsed.filters)}”", f"Connected: {names}")
         return None
     return selected
 
 
-def build_results(*args, **kwargs) -> list[Result]:
-    return finalize(_build_results(*args, **kwargs))
+def build_results(parsed: ParsedQuery, screens: list[Screen], keyword: str, *args, **kwargs) -> list[Result]:
+    results = _build_results(parsed, screens, keyword, *args, **kwargs)
+    if parsed.shortened:
+        _also_screens(_Builder(keyword, results), parsed.shortened, screens)
+    return finalize(results)
+
+
+def _also_screens(b: _Builder, typed: str, screens: list[Screen]) -> None:
+    """"sc r" means reset, but may have been heading to the right screen: keep it one row away."""
+    for s in screens:
+        if any(word.startswith(typed) for word in s.search_text.split()):
+            b.add(
+                ChangeQueryResult(
+                    b.q(f"#{s.number} "),
+                    title=s.title,
+                    sub=f"{_status(s)}   —   {' · '.join(s.tags)}",
+                    icon=icon_for(s),
+                    auto_complete_text=b.q(f"#{s.number} "),
+                ).with_menu([s])
+            )
 
 
 def _build_results(
@@ -146,11 +192,16 @@ def _build_results(
     keyword: str,
     profiles: dict[str, dict] | None = None,
     customized: frozenset[str] = frozenset(),
+    feedback: Feedback | None = None,
 ) -> list[Result]:
     b = _Builder(keyword)
     if not screens:
         b.error("No screens found", "Windows did not report any active display")
         return b.results
+    if profiles is None:
+        profiles = DEFAULT_PROFILES
+    if feedback is not None:
+        _feedback(b, feedback)
     if parsed.error:
         b.error(parsed.error, "Examples: 50 · +10 · c 70 · hdr on · #2 80 · id")
         return b.results
@@ -170,11 +221,14 @@ def _build_results(
     if parsed.action is Action.NAME:
         name_view(b, parsed, screens)
         return b.results
+    if parsed.action is Action.SETTINGS:
+        b.add(_settings_result(b))
+        return b.results
     if parsed.action is Action.PROFILE:
-        profile_view(b, parsed, screens, profiles if profiles is not None else DEFAULT_PROFILES, customized)
+        profile_view(b, parsed, screens, profiles, customized)
         return b.results
 
-    selected = _select(parsed, screens, b)
+    selected = _select(parsed, screens, b, profiles)
     if selected is None:
         return b.results
 
@@ -188,7 +242,9 @@ def _build_results(
     elif parsed.has_selector and len(selected) == 1:
         _detail(b, selected[0])
     else:
-        _overview(b, parsed, selected)
+        _overview(b, parsed, selected, profiles)
+    if parsed.action is Action.OVERVIEW and parsed.filters:
+        _suggest(b, " ".join(parsed.filters), profiles, screens)  # "sc n": several commands fit
 
     # Every row acting on screens gets the Shift+Enter quick-action submenu.
     for result in b.results:
@@ -199,7 +255,7 @@ def _build_results(
     return b.results
 
 
-def _overview(b: _Builder, parsed: ParsedQuery, selected: list[Screen]) -> None:
+def _overview(b: _Builder, parsed: ParsedQuery, selected: list[Screen], profiles: dict[str, dict]) -> None:
     for s in selected:
         b.add(
             ChangeQueryResult(
@@ -213,6 +269,8 @@ def _overview(b: _Builder, parsed: ParsedQuery, selected: list[Screen]) -> None:
                 copy_text=_details(s),
             ).with_menu([s])
         )
+    if not parsed.has_selector:
+        b.add(_settings_result(b, sub="Edit profiles screen by screen, nicknames and values in a window"))
     b.add(
         IdentifyResult(
             selected,
@@ -227,12 +285,30 @@ def _overview(b: _Builder, parsed: ParsedQuery, selected: list[Screen]) -> None:
             ("brightness ", "Brightness", "Set all screens or one, exact or relative · sc 50 · sc +10 · sc #2 30", ICON_BRIGHTNESS),
             ("contrast ", "Contrast", "Set all screens or one, exact or relative · sc c 70 · sc c -10", ICON_CONTRAST),
             ("hdr ", "HDR", f"{_windows_hdr_state(selected)} · Windows HDR or one screen · sc hdr · sc hdr off", ICON_HDR),
-            ("profile ", "Profiles", "Day, night, movie or your own: brightness, contrast and HDR in one go", ICON_ALL),
+            ("profile ", "Profiles", _profiles_hint(profiles, selected), ICON_ALL),
             ("name ", "Nicknames", "Give screens your own names · sc name #2 Gaming", ICON_IDENTIFY),
             ("? ", "All commands", "Every command with examples · tip: Shift+Enter on a screen for quick actions", ICON_APP),
         )
         for text, title, sub_text, icon in menu:
             b.add(ChangeQueryResult(b.q(text), title=title, sub=sub_text, icon=icon, auto_complete_text=b.q(text)))
+
+
+def _settings_result(b: _Builder, title: str = "Open the settings panel", sub: str = "") -> Result:
+    return SettingsResult(
+        title=title,
+        sub=sub or "Profiles screen by screen with live preview, nicknames, brightness, contrast and HDR",
+        icon=ICON_APP,
+        glyph=GLYPH_SETTINGS,
+        auto_complete_text=b.q("settings"),
+    )
+
+
+def _profiles_hint(profiles: dict[str, dict], screens: list[Screen]) -> str:
+    active = active_profiles(profiles, screens)
+    names = ", ".join(profiles)
+    if active:
+        return f"Active: {', '.join(active)} · {names} · brightness, contrast and HDR in one go"
+    return f"{names} · brightness, contrast and HDR in one go"
 
 
 def _windows_hdr_state(screens: list[Screen]) -> str:
@@ -468,13 +544,15 @@ _HELP: tuple[tuple[str, str, str, str], ...] = (
     ("#1 ", "sc #2 · sc lg · sc left · sc hdmi", "Pick a screen by number, name, brand, position (left, right, top, primary) or connection (hdmi, dp)", ICON_ALL),
     ("#1 50", "sc #2 80 · sc lg c 40 · sc left hdr on", "Combine a screen with any command", ICON_ALL),
     ("night", "sc day · sc night · sc movie · sc profile", "Profiles: apply saved brightness, contrast and HDR to all screens", ICON_ALL),
-    ("night save", "sc night save · sc profile save gaming", "Save the current settings of every screen as a profile", ICON_ALL),
+    ("profile save ", "sc night save · sc profile save gaming", "Save the current settings of every screen as a profile; then sc gaming applies it", ICON_ALL),
+    ("settings", "sc settings", "Open the settings panel: edit profiles screen by screen with live preview, nicknames and values", ICON_APP),
     ("reset", "sc reset", "Something looks wrong or stuck? Restart monitor communication and clear caches", ICON_APP),
     ("name #1 ", "sc name #2 Gaming", "Nickname a screen (shown everywhere, follows the monitor); sc name #2 alone removes it", ICON_IDENTIFY),
 )
 _HELP_KEYS: tuple[tuple[str, str], ...] = (
     ("Shift+Enter on a screen or an 'all screens' row", "Quick actions: brightness and contrast presets, HDR on/off, identify"),
     ("Ctrl+C on a screen", "Copy its details (model, serial, connection, current values)"),
+    ("Enter on the ✓ row after a change", "Undo it: values, profiles and nicknames go back to what they were"),
 )
 
 

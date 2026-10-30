@@ -10,6 +10,8 @@ from typing import Any
 
 from flogin import ErrorResponse, ExecuteResponse, Plugin, Query, QueryResponse, Result, SearchHandler
 
+from .feedback import Feedback
+from .panel import PanelServer
 from .query_parser import parse_query
 from .screens import ScreenService
 from .store import Store, data_dir
@@ -26,16 +28,19 @@ class ScreenSearchHandler(SearchHandler["ScreenControlPlugin"]):
 
     async def callback(self, query: Query[Any]) -> list[Result]:
         assert self.plugin is not None
-        parsed = parse_query(query.text)
+        store = self.plugin.store
+        profiles = store.profiles()
+        parsed = parse_query(query.text, profiles)
         try:
             screens = await self.plugin.service.screens()
         except Win32Error as e:
             log.warning("Could not read screens: %s", e)
             return [reset_result("Could not read your screens", e.message)]
-        store = self.plugin.store
-        profiles = store.profiles()
         customized = frozenset(n for n in profiles if store.is_customized(n))
-        return build_results(parsed, screens, query.keyword, profiles, customized)
+        feedback = self.plugin.feedback
+        if feedback is not None and not feedback.shown_for(query.raw_text):
+            feedback = None
+        return build_results(parsed, screens, query.keyword, profiles, customized, feedback)
 
     async def on_error(self, query: Query[Any], error: Exception) -> list[Result]:
         # Show the problem in Flow instead of returning a JSON-RPC error,
@@ -61,13 +66,21 @@ class ScreenControlPlugin(Plugin):
             ignore_cancellation_requests=True,
         )
         self.store = Store(data_dir(Path(__file__).resolve().parent.parent))
+        self.feedback: Feedback | None = None
+        """The last action, shown (with undo) at the top of the list it came from."""
+        self.panel = PanelServer(self)
         self.service = ScreenService()
         self.service.nickname_for = self.store.nickname
         self.register_search_handler(ScreenSearchHandler())
         self.register_event(self._warm_up, "on_initialization")
         self.register_event(self._on_close, "on_close")  # Flow sends "close" when it exits
 
+    def open_panel(self) -> None:
+        """Show the settings window (served by this process while it is open)."""
+        self.panel.open(asyncio.get_running_loop())
+
     async def _on_close(self, *_: Any) -> ExecuteResponse:
+        self.panel.stop()
         self.service.close()
         return ExecuteResponse(hide=False)
 
@@ -86,6 +99,7 @@ class ScreenControlPlugin(Plugin):
             tasks.add(task)
             task.add_done_callback(tasks.discard)
         log.info("Flow closed the connection, stopping")
+        self.panel.stop()
         self.service.close()
 
     async def _process_safely(self, line: str) -> None:
