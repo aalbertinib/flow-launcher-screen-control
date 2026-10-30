@@ -62,6 +62,7 @@ def collect() -> list[Path]:
     files = [ROOT / "plugin.json", ROOT / "main.py", ROOT / "LICENSE", ROOT / "THIRD_PARTY_NOTICES.md"]
     files += sorted((ROOT / "assets").glob("*.png"))
     files += sorted((ROOT / "screen_control").rglob("*.py"))
+    files += sorted((ROOT / "screen_control").rglob("*.html"))  # the settings panel
     files += sorted(
         p
         for p in LIB.rglob("*")
@@ -72,6 +73,17 @@ def collect() -> list[Path]:
 
 RELEASE_ZIP = "Flow.Launcher.Plugin.ScreenControl.zip"
 DEFAULT_REPO = "flow-launcher-screen-control"
+
+
+def write_release_notes(version: str, out: str) -> None:
+    """This version's section of CHANGELOG.txt, for the GitHub release."""
+    lines = (ROOT / "CHANGELOG.txt").read_text(encoding="utf-8").splitlines()
+    try:
+        start = lines.index(f"v{version}") + 1
+    except ValueError:
+        raise SystemExit(f"CHANGELOG.txt has no v{version} section") from None
+    end = next((i for i in range(start, len(lines)) if re.fullmatch(r"v\d+\.\d+\.\d+", lines[i])), len(lines))
+    Path(out).write_text("\n".join(lines[start:end]).strip() + "\n", encoding="utf-8")
 
 
 def build(archive_name: str) -> None:
@@ -356,6 +368,9 @@ def main() -> None:
     )
     p_zip = sub.add_parser("zip", help="build a distributable archive")
     p_zip.add_argument("archive", nargs="?", default=RELEASE_ZIP)
+    p_notes = sub.add_parser("notes", help="write one version's changelog section to a file")
+    p_notes.add_argument("version")
+    p_notes.add_argument("out")
     p_man = sub.add_parser("manifest", help="write the Flow plugin store entry into release/")
     p_man.add_argument("--owner", required=True, help="GitHub user or organisation hosting the repository")
     p_man.add_argument("--repo", default=DEFAULT_REPO, help=f"repository name (default {DEFAULT_REPO})")
@@ -372,6 +387,8 @@ def main() -> None:
         install_lib()
     elif args.command == "install":
         install(args.flow_data, restart=not args.no_restart, hotkey=args.hotkey)
+    elif args.command == "notes":
+        write_release_notes(args.version, args.out)
     elif args.command == "manifest":
         write_manifest(args.owner, args.repo, args.branch, args.set_website)
     else:

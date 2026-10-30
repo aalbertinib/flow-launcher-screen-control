@@ -1,3 +1,24 @@
+v1.2.0
+
+- Short commands: any letters that fit a single command work (sc p, sc s, sc r, sc ni, sc p save gaming);
+  when several fit (sc n) they are suggested, and a screen the letters could mean stays one row away
+- Settings panel (sc settings): profiles screen by screen with live preview on the screens,
+  try without saving, rename / duplicate / reset; nicknames, values and HDR per screen.
+  Opens as an app window in Edge, Chrome, Brave or Vivaldi (else the default browser);
+  runs on this computer only and goes away once the window is closed.
+  Has its own window icon, title bar colour and dialogs, shows unsaved changes, says why a screen
+  can't be changed, and works with the keyboard
+- Your own profiles apply by name (sc gaming), like day / night / movie
+- Profile names complete as you type: sc gam, sc profile gam, sc profile save g, sc profile delete
+- Profiles show what they would change right now (1: ☀ 40→10%), and "✓ active" when they already match
+- Saving over a profile shows what changes first ("Same as the saved settings" when nothing does)
+- Names that already mean something (hdr, 50, #2...) are refused; a name that hides a screen word is flagged
+- Live feedback: after a change, a ✓ row at the top of the list says what happened and what it was before
+- Undo from that row (Enter): levels, HDR, profiles applied, saved or deleted, nicknames;
+  repeated changes (sc +10 three times) undo back to the start
+- Successful actions no longer pop up a Windows notification (errors still do)
+- Previews skip screens without DDC/CI instead of promising changes they can't make
+
 v1.1.0
 
 - Profiles: sc day / night / movie, or save your own (sc profile save gaming)

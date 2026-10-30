@@ -10,25 +10,29 @@ Grammar (words in any order, case-insensitive)::
 Special forms (first word decides):
 
     name #2 My Desk      nickname a screen (no text: remove)
+    settings             open the settings panel (profiles, nicknames, values)
     day | night | movie  apply a profile; add "save" to store current values
+    gaming               your own profiles work the same way (exact name)
     profile [save|delete] [name]
     value     50 | 50% | +10 | -10                     (brightness/contrast)
               on | off | toggle                        (hdr)
     selector  #2 | all | any word matched against the screen's name,
               vendor, position, connection... (lg, left, primary, hdmi)
 
-A bare number means brightness (``sc 50``).
+A bare number means brightness (``sc 50``). Commands can be shortened as long as
+the letters fit only one of them (``sc p``, ``sc se``, ``sc ni``); see ``_shortened``.
 """
 
 from __future__ import annotations
 
 import enum
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 from .screens import Feature
 
-__all__ = ("Action", "HdrMode", "ParsedQuery", "parse_query")
+__all__ = ("Action", "HdrMode", "ParsedQuery", "parse_query", "profile_name_problem")
 
 
 class Action(enum.Enum):
@@ -40,6 +44,7 @@ class Action(enum.Enum):
     NAME = "name"
     PROFILE = "profile"
     RESET = "reset"
+    SETTINGS = "settings"
 
 
 class HdrMode(enum.Enum):
@@ -63,6 +68,8 @@ class ParsedQuery:
     profile_name: str | None = None
     profile_op: str = "apply"
     """For PROFILE: apply | save | delete."""
+    shortened: str | None = None
+    """The letters typed when they stood for a whole command ("p" for profile)."""
 
     @property
     def has_selector(self) -> bool:
@@ -127,14 +134,70 @@ _PROFILE_OPS = {"save": "save", "store": "save", "delete": "delete", "remove": "
 
 
 RESET_WORDS = frozenset({"reset", "repair", "fix", "restart", "reinit"})
+SETTINGS_WORDS = frozenset(
+    {"settings", "setting", "config", "configure", "panel", "options", "preferences", "prefs",
+     "parametres", "paramètres", "reglages", "réglages"}
+)
 
 
-def _parse_special(raw: list[str]) -> ParsedQuery | None:
+# What a first word can be short for. Brightness, contrast, HDR and identify have
+# their own prefixes (_setting_for), but count here: "h" stays HDR rather than help.
+_COMMANDS = ("name", "profile", "reset", "settings", "help", "day", "night", "movie")
+_OTHER_WORDS = ("brightness", "contrast", "hdr", "identify")
+
+
+def _shortened(token: str, profile_names: frozenset[str]) -> str | None:
+    """The one command ``token`` starts, None if it is complete or fits several."""
+    fits = [w for w in (*_COMMANDS, *_OTHER_WORDS, *profile_names) if w.startswith(token)]
+    return fits[0] if len(fits) == 1 and fits[0] != token and fits[0] in _COMMANDS else None
+
+
+def _expand_command(raw: list[str], low: list[str], profile_names: frozenset[str]) -> str | None:
+    """Replace a shortened first word by its command; returns the letters it replaced."""
+    word = _shortened(low[0], profile_names)
+    if word is None:
+        return None
+    rest = low[1:]
+    if word == "profile":
+        # "p 50" and "pr #2" keep picking screens ("primary").
+        usable = not rest or not (_NUMBER.match(rest[0]) or _SCREEN.match(rest[0]))
+    elif word in BUILTIN_PROFILES:
+        usable = not rest or (len(rest) == 1 and rest[0] in _PROFILE_OPS)
+    else:
+        usable = word == "name" or not rest
+    if not usable:
+        return None
+    typed = low[0]
+    raw[0] = low[0] = word
+    return typed
+
+
+def _parse_special(raw: list[str], profile_names: frozenset[str] = frozenset()) -> ParsedQuery | None:
     low = [t.lower() for t in raw]
     if not low:
         return None
+    typed = _expand_command(raw, low, profile_names)
+    q = _parse_command(raw, low, profile_names)
+    if q is not None and typed is not None and len(low) == 1:
+        q.shortened = typed
+    return q
+
+
+def _parse_command(raw: list[str], low: list[str], profile_names: frozenset[str]) -> ParsedQuery | None:
+    if low == ["help"]:
+        return ParsedQuery(action=Action.HELP)
     if len(low) == 1 and low[0] in RESET_WORDS:
         return ParsedQuery(action=Action.RESET)
+    if len(low) == 1 and low[0] in SETTINGS_WORDS:
+        return ParsedQuery(action=Action.SETTINGS)
+
+    # gaming  /  gaming setup save: the user's own profiles, by their exact name
+    # (profile_name_problem keeps saved names from clashing with commands).
+    joined = " ".join(low)
+    if joined in profile_names:
+        return ParsedQuery(action=Action.PROFILE, profile_name=joined)
+    if len(low) > 1 and low[-1] in _PROFILE_OPS and " ".join(low[:-1]) in profile_names:
+        return ParsedQuery(action=Action.PROFILE, profile_name=" ".join(low[:-1]), profile_op=_PROFILE_OPS[low[-1]])
 
     # name #2 My Desk  /  #2 name My Desk
     name_at = next((i for i in (0, 1) if i < len(low) and low[i] in NAME_WORDS), None)
@@ -162,13 +225,20 @@ def _parse_special(raw: list[str]) -> ParsedQuery | None:
         elif len(rest) > 1 and rest[1] in _PROFILE_OPS:  # "night save"
             q.profile_op = _PROFILE_OPS[rest[1]]
             rest = rest[:1] + rest[2:]
+        elif rest and low[0] in PROFILE_WORDS and not any(n.startswith(rest[0]) for n in BUILTIN_PROFILES | profile_names):
+            # "p sa gaming": short for save, unless a profile starts with those letters.
+            ops = {op for word, op in _PROFILE_OPS.items() if word.startswith(rest[0])}
+            if len(ops) == 1:
+                q.profile_op = ops.pop()
+                rest = rest[1:]
         q.profile_name = " ".join(rest) or None
         return q
     return None
 
 
-def parse_query(text: str) -> ParsedQuery:
-    special = _parse_special(text.split())
+def parse_query(text: str, profile_names: Iterable[str] = ()) -> ParsedQuery:
+    """``profile_names``: saved profiles, so ``sc gaming`` applies the "gaming" profile."""
+    special = _parse_special(text.split(), frozenset(profile_names) - BUILTIN_PROFILES)
     if special is not None:
         return special
 
@@ -235,3 +305,16 @@ def parse_query(text: str) -> ParsedQuery:
         q.action = Action.LEVEL
         q.feature = Feature.CONTRAST if setting == "contrast" else Feature.BRIGHTNESS
     return q
+
+
+def profile_name_problem(name: str) -> str | None:
+    """Why ``name`` can't be a profile name (it already means something), else None."""
+    if name in BUILTIN_PROFILES:
+        return None
+    q = parse_query(name)
+    words = name.split()
+    if not words:
+        return "Type a profile name"
+    if q.action is Action.OVERVIEW and q.screen_number is None and q.error is None and q.filters == words:
+        return None
+    return f"“{name}” is already a ScreenControl command: pick another name"

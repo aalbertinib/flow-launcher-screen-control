@@ -327,9 +327,12 @@ class ViewTests(unittest.TestCase):
                 self.assertEqual(r.sub_tooltip, r.sub)
 
     def test_half_typed_command_word_suggests_instead_of_error(self) -> None:
-        self.assertEqual(titles("nig"), ["sc night"])
-        self.assertEqual(titles("mov"), ["sc movie"])
-        self.assertEqual(titles("n")[0], "1 · FQ320")  # "n" matches screens ("secondary"...): filter wins
+        self.assertEqual(titles("nig")[0], "Apply profile “night”")
+        self.assertEqual(titles("mov")[0], "Apply profile “movie”")
+        t = titles("n")  # name or night: screens that match, then both commands
+        self.assertEqual(t[0], "1 · FQ320")
+        self.assertIn("sc name", t)
+        self.assertIn("sc night", t)
         self.assertIn("No screen matches", titles("dell")[0])  # a real non-matching screen word
 
     def test_no_ddc(self) -> None:

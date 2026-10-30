@@ -46,7 +46,7 @@ pm install ScreenControl
 Install a specific release straight from Flow ([all releases](https://github.com/aalbertinib/flow-launcher-screen-control/releases)):
 
 ```
-pm install https://github.com/aalbertinib/flow-launcher-screen-control/releases/download/v1.1.0/Flow.Launcher.Plugin.ScreenControl.zip
+pm install https://github.com/aalbertinib/flow-launcher-screen-control/releases/download/v1.2.0/Flow.Launcher.Plugin.ScreenControl.zip
 ```
 
 Or by hand: extract the release zip into `%APPDATA%\FlowLauncher\Plugins\ScreenControl`
@@ -76,7 +76,10 @@ yourself, or `--hotkey "Ctrl+Alt+F9"` for another shortcut (`--hotkey none` for 
 ## Usage guide
 
 Everything starts with `sc`. Words can be typed in any order, and `sc ?` lists every
-command with an example. A half-typed command suggests how to finish it (`sc nig` → `sc night`). Picking a row with `Enter` runs it and keeps Flow open, so you
+command with an example. Commands can be shortened to the letters that fit only one of them: `sc p` for profiles,
+`sc s` for settings, `sc r` for reset, `sc ni` for night, `sc p save gaming`. When several fit
+(`sc n`: name or night), it suggests them; a screen those letters could mean (`sc r`: right) is
+listed below the command. Picking a row with `Enter` runs it and keeps Flow open, so you
 can adjust again straight away.
 
 <p align="center"><img src="docs/images/help.png" width="480" alt="sc ? lists every command with an example"></p>
@@ -154,14 +157,41 @@ A profile sets brightness, contrast and HDR on every screen in one go.
 | `sc day` | Brightness 80% on all screens |
 | `sc night` | Brightness 10%, HDR off |
 | `sc movie` | Brightness 70%, HDR on |
-| `sc profile` | All profiles, with what each one sets on each screen |
-| `sc night save` | Replace "night" with your current settings |
+| `sc profile` | All profiles, with what each one would change right now (`✓ active` when it already matches) |
+| `sc night save` | Replace "night" with your current settings, showing what changes first |
 | `sc profile save gaming` | Create your own profile from the current settings |
+| `sc gaming` | Apply your own profile by its name, like the built-in ones |
 | `sc profile reset night` / `sc profile delete gaming` | Restore a default / delete your own |
 
-Saved profiles remember each screen separately.
+Saved profiles remember each screen separately. Profile names complete as you type
+(`sc gam` → `sc gaming`, `sc profile save g` offers to replace "gaming"), and names that
+already mean something (`hdr`, `50`, `#2`...) are refused.
+
+### Undo
+
+After a change, the refreshed list starts with a **✓ row** saying what happened and what the
+values were before. Press `Enter` on it to undo: brightness, contrast, HDR, an applied profile,
+a saved or deleted profile, or a nickname. Several changes in a row (`sc +10` three times) undo
+back to where they started.
 
 <p align="center"><img src="docs/images/profiles.png" width="480" alt="Profiles with what each one sets per screen"></p>
+
+### Settings panel
+
+**`sc settings`** (also `config`, `panel`, `options`) opens a window for everything that is
+easier with sliders than with typing:
+
+- **Profiles, screen by screen**: values for all screens, or each screen its own, and which
+  values a profile leaves alone. Each screen shows what applying the profile would change.
+  Create, rename, duplicate, delete, or reset a default profile.
+- **Live preview**: the screens follow the sliders while you edit and go back to their values
+  when you turn it off. **Try it** applies the profile without saving; **Use current values**
+  fills it from your screens.
+- **Screens**: nicknames, brightness, contrast and HDR, identify, reset communication.
+
+Nothing to install: the window is Edge, Chrome, Brave or Vivaldi in app mode (without tabs or
+address bar), or a tab in your default browser if none of them is installed. It runs on this
+computer only, loads nothing from the internet, and goes away a minute after the window is closed.
 
 ### Nicknames
 
@@ -195,7 +225,7 @@ Nicknames can also be used to pick a screen: `sc gaming 40`.
   `%APPDATA%\FlowLauncher\Settings\Plugins\ScreenControl\screen_control.json` and survive updates.
 - Laptop built-in screens use Windows' brightness control (no contrast). This path has not
   been tested on real hardware yet.
-- The plugin never uses the network.
+- The plugin never goes online, and nothing leaves this computer.
 
 ---
 

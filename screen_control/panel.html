@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ScreenControl settings</title>
+<link rel="icon" id="app-icon" type="image/png" href="data:image/png;base64,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">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f5f7">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#17191d">
+<style>
+:root {
+  --bg: #f4f5f7; --panel: #ffffff; --panel-2: #f8f9fb; --line: #e2e5ea; --text: #1b1f24;
+  --muted: #5d6673; --accent: #2563eb; --accent-text: #ffffff; --danger: #c62828;
+  --ok: #1e7d4f; --warn-bg: #fff6e0; --warn: #8a5a00; --focus: #2563eb66; --shadow: 0 1px 2px #0000000f, 0 2px 8px #00000010;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17191d; --panel: #202328; --panel-2: #262a30; --line: #343941; --text: #e8eaed;
+    --muted: #a0a8b3; --accent: #5b8def; --accent-text: #0d1117; --danger: #ef6b6b;
+    --ok: #4cc38a; --warn-bg: #3a2f14; --warn: #f0c063; --focus: #5b8def66; --shadow: 0 1px 2px #0006;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--text); font: 14px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+button, input, select { font: inherit; color: inherit; }
+header, main { max-width: 1100px; margin-inline: auto; }
+header { display: flex; align-items: center; gap: 12px; padding: 14px 20px 0; }
+header img { width: 26px; height: 26px; }
+header h1 { font-size: 17px; font-weight: 600; margin: 0; }
+nav { display: flex; gap: 4px; margin-left: 8px; }
+nav button { border: 0; background: none; padding: 8px 14px; border-radius: 8px 8px 0 0; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; }
+nav button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+header .spacer { flex: 1; }
+main { padding: 16px 20px 24px; }
+.btn { border: 1px solid var(--line); background: var(--panel); padding: 6px 12px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+.btn:hover { background: var(--panel-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+.btn.danger { color: var(--danger); }
+.btn:disabled { opacity: .5; cursor: default; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
+.layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 16px; align-items: start; }
+.layout > .list { position: sticky; top: 12px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+.list { padding: 6px; }
+.list button { display: flex; width: 100%; align-items: center; gap: 8px; border: 0; background: none; text-align: left; padding: 8px 10px; border-radius: 6px; cursor: pointer; }
+.list button:hover { background: var(--panel-2); }
+.list button[aria-current="true"] { background: var(--panel-2); box-shadow: inset 3px 0 0 var(--accent); font-weight: 600; }
+.list .name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.list .new { color: var(--accent); }
+.badge { font-size: 11.5px; padding: 1px 7px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); font-weight: 500; }
+.badge.ok { color: var(--ok); border-color: currentColor; }
+.editor { padding: 18px 18px 0; }
+.editor-head { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; margin-bottom: 6px; }
+label.field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+input[type=text] { border: 1px solid var(--line); background: var(--panel-2); border-radius: 6px; padding: 6px 10px; min-width: 220px; }
+.hint { color: var(--muted); font-size: 12.5px; }
+.warn { background: var(--warn-bg); color: var(--warn); border-radius: 6px; padding: 8px 12px; margin: 10px 0; font-size: 13px; }
+.rows { display: flex; flex-direction: column; gap: 10px; margin: 14px 0; }
+.row { border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: var(--panel-2); }
+.row-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+.row-head .title { font-weight: 600; }
+.row-head .spacer { flex: 1; }
+.chip { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 6px; color: #fff; font-weight: 700; font-size: 13px; flex: none; }
+.chip.all { background: var(--muted); width: auto; padding: 0 8px; font-size: 12px; }
+.chip.all, .chip.all * { color: var(--panel); }
+.controls { display: grid; gap: 8px; max-width: 640px; }
+.control { display: grid; grid-template-columns: 136px minmax(0, 1fr) 72px; gap: 10px; align-items: center; min-height: 28px; }
+.control .lbl { display: flex; align-items: center; gap: 6px; }
+.control .seg { justify-self: start; grid-column: 2 / -1; }
+.control .seg + span { display: none; }
+.control input[type=range] { width: 100%; accent-color: var(--accent); }
+.control .val { text-align: right; font-variant-numeric: tabular-nums; }
+.control.off .val { font-size: 12.5px; }
+.control.off .val, .control.off input[type=range] { opacity: .45; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; background: var(--panel); padding: 3px 12px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); }
+.seg button:disabled { opacity: .45; cursor: default; }
+.preview { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+.preview .why { display: block; color: var(--warn); }
+.preview b { color: var(--text); font-weight: 600; }
+.inherit { font-size: 12.5px; color: var(--muted); }
+.switch { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--muted); user-select: none; }
+.actions { position: sticky; bottom: 0; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; border-top: 1px solid var(--line); padding: 12px 0; background: var(--panel); border-radius: 0 0 10px 10px; }
+.dirty { color: var(--warn); font-size: 12.5px; }
+.dirty::before { content: "● "; }
+.field-err { color: var(--danger); font-size: 12.5px; flex-basis: 100%; }
+.field-err:empty { display: none; }
+dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 32px #0005; padding: 20px 22px; max-width: min(420px, calc(100% - 32px)); }
+dialog::backdrop { background: #0006; }
+dialog p { margin: 0 0 16px; }
+dialog .buttons { display: flex; justify-content: flex-end; gap: 8px; }
+.btn.danger-solid { background: var(--danger); border-color: var(--danger); color: var(--panel); font-weight: 600; }
+.actions .spacer { flex: 1; }
+.screens { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; }
+.screen { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.screen .head { display: flex; gap: 10px; align-items: center; }
+.screen .head .chip { width: 34px; height: 34px; font-size: 16px; border-radius: 8px; }
+.screen .tags { color: var(--muted); font-size: 12.5px; }
+.screen .nick { display: flex; gap: 8px; }
+.screen .nick input { flex: 1; min-width: 0; }
+.err { color: var(--danger); font-size: 12.5px; }
+.toolbar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+.toolbar .spacer { flex: 1; }
+#toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 9px 16px; border-radius: 8px; box-shadow: var(--shadow); max-width: min(680px, calc(100% - 32px)); opacity: 0; pointer-events: none; transition: opacity .15s; white-space: pre-line; }
+#toast.show { opacity: 1; }
+#toast.error { background: var(--danger); color: #fff; }
+#offline { position: fixed; inset: 0; background: color-mix(in srgb, var(--bg) 88%, transparent); display: none; place-items: center; text-align: center; padding: 16px; }
+#offline.show { display: grid; }
+.empty { padding: 40px; text-align: center; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { #toast { transition: none; } }
+@media (forced-colors: active) {
+  .seg button[aria-pressed="true"], .btn.primary { forced-color-adjust: none; background: Highlight; color: HighlightText; }
+  .list button[aria-current="true"] { outline: 2px solid Highlight; }
+}
+@media (max-width: 760px) {
+  .layout { grid-template-columns: 1fr; }
+  header { flex-wrap: wrap; padding: 12px 16px 0; }
+  main { padding: 12px 16px 24px; }
+  .layout > .list { position: static; }
+  .control { grid-template-columns: 112px minmax(0, 1fr) 68px; }
+  .control .seg { grid-column: 1 / -1; }
+  input[type=text] { min-width: 0; width: 100%; }
+  .screens { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<header>
+  <img id="header-icon" alt="">
+  <h1>ScreenControl</h1>
+  <nav role="tablist" aria-label="Settings">
+    <button role="tab" data-tab="profiles" aria-controls="main" aria-selected="true">Profiles</button>
+    <button role="tab" data-tab="screens" aria-controls="main" aria-selected="false" tabindex="-1">Screens</button>
+  </nav>
+  <span class="spacer"></span>
+  <button class="btn" id="identify-all" title="Show each screen's number on the screen itself">Identify screens</button>
+</header>
+<main id="main" role="tabpanel"><div class="empty">Loading your screens…</div></main>
+<dialog id="ask" aria-labelledby="ask-text"><p id="ask-text"></p><div class="buttons">
+  <button class="btn" id="ask-no">Cancel</button><button class="btn" id="ask-yes"></button>
+</div></dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="offline"><div class="card" style="padding:24px 28px;max-width:420px">
+  <h2 style="margin:0 0 8px;font-size:17px">This panel is closed</h2>
+  <p class="hint" style="margin:0">It lost touch with ScreenControl (Flow restarted, or it was left idle). Open it again from Flow Launcher with <b>sc settings</b>.</p>
+</div></div>
+<script>
+"use strict";
+document.getElementById("header-icon").src = document.getElementById("app-icon").href;
+const token = new URLSearchParams(location.search).get("t") || sessionStorage.getItem("sc-token") || "";
+try { sessionStorage.setItem("sc-token", token); } catch (e) {}
+
+const FEATURES = [["brightness", "☀", "Brightness"], ["contrast", "◑", "Contrast"]];
+const S = { state: null, tab: "profiles", sel: undefined, draft: null, dirty: false, live: false, snapshot: null, tried: null };
+
+// ---------------------------------------------------------------- helpers
+
+function h(tag, attrs, ...children) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === undefined || v === null || v === false) continue;
+    if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (k === "class") el.className = v;
+    else if (k === "style") el.style.cssText = v;
+    else el.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of children.flat()) if (c !== null && c !== undefined && c !== false) el.append(c instanceof Node ? c : String(c));
+  return el;
+}
+
+let toastTimer = 0;
+function toast(text, error) {
+  const el = document.getElementById("toast");
+  el.textContent = text; el.className = "show" + (error ? " error" : "");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.className = "", error ? 6000 : 2600);
+}
+
+async function api(path, body, opts) {
+  const init = { method: body === undefined ? "GET" : "POST", headers: { "X-Token": token }, ...(opts || {}) };
+  if (body !== undefined) { init.headers["Content-Type"] = "application/json"; init.body = JSON.stringify(body); }
+  let res;
+  try { res = await fetch(path, init); } catch (e) { offline(); throw e; }
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 403) { offline(); throw new Error(data.error || "Closed"); }
+  if (!res.ok) throw new Error(data.error || "Request failed");
+  return data;
+}
+// Native confirm() shows the page's address as its title: ask in the page's own style.
+function ask(text, yes, danger) {
+  const dlg = document.getElementById("ask"), ok = document.getElementById("ask-yes");
+  document.getElementById("ask-text").textContent = text;
+  ok.textContent = yes; ok.className = "btn " + (danger ? "danger-solid" : "primary");
+  return new Promise((resolve) => {
+    dlg.onclose = () => resolve(dlg.returnValue === "yes");
+    ok.onclick = () => dlg.close("yes");
+    document.getElementById("ask-no").onclick = () => dlg.close("no");
+    dlg.returnValue = "no"; dlg.showModal(); document.getElementById("ask-no").focus();
+  });
+}
+function offline() { document.getElementById("offline").classList.add("show"); }
+
+const kw = () => (S.state && S.state.keyword) || "sc";
+const clone = (o) => JSON.parse(JSON.stringify(o || {}));
+const screens = () => (S.state ? S.state.screens : []);
+const profile = (name) => S.state.profiles.find((p) => p.name === name);
+const effective = (settings, s) => settings[s.id] || settings["*"] || {};
+// The chip already shows the number, so rows name the screen without it.
+const screenName = (s) => s.nickname || s.name;
+const screenHint = (s) => [...(s.nickname ? [s.name] : []), ...s.tags].join(" · ");
+const cannotSet = (s) => s.brightness.error && s.contrast.error ? s.brightness.error : "";
+function markDirty() {
+  S.dirty = true;
+  const save = document.getElementById("save"), note = document.getElementById("dirty");
+  if (save) save.disabled = false;
+  if (note) note.hidden = false;
+}
+
+function changesFor(settings, s) {
+  const want = effective(settings, s), now = s.current, bits = [];
+  for (const [key, sym] of FEATURES) {
+    if (want[key] == null || s[key].error || want[key] === now[key]) continue;
+    bits.push(`${sym} ${now[key] ?? "?"}→${want[key]}%`);
+  }
+  if (want.hdr != null && s.hdr && want.hdr !== s.hdr.enabled) bits.push(`HDR ${s.hdr.enabled ? "on" : "off"}→${want.hdr ? "on" : "off"}`);
+  return bits;
+}
+
+// ---------------------------------------------------------------- data
+
+async function load(fresh) {
+  S.state = await api("/api/state" + (fresh ? "?fresh=1" : ""));
+  if (S.sel === undefined) S.sel = (S.state.profiles[0] || {}).name ?? null;
+  if (!S.draft && S.tab === "profiles") openDraft(S.sel);
+  render();
+}
+
+function openDraft(name) {
+  if (name === null) {
+    // A new profile starts from the current values of every screen.
+    const settings = {};
+    for (const s of screens()) if (Object.keys(s.current).length) settings[s.id] = clone(s.current);
+    S.draft = { name: "", original: null, builtin: false, settings };
+  } else {
+    const p = profile(name);
+    S.draft = { name: p.name, original: p.name, builtin: p.builtin, settings: clone(p.settings) };
+  }
+  S.sel = name; S.dirty = false;
+}
+
+async function confirmLeave() {
+  return !S.dirty || ask("Discard your unsaved changes to this profile?", "Discard", true);
+}
+
+async function stopLive() {
+  if (!S.live) return;
+  S.live = false;
+  if (S.snapshot) {
+    const plan = S.snapshot; S.snapshot = null;
+    try { await api("/api/apply", { plan }); } catch (e) { toast(e.message, true); }
+  }
+}
+
+function snapshot(withHdr) {
+  const plan = {};
+  for (const s of screens()) {
+    const c = clone(s.current);
+    if (!withHdr) delete c.hdr;
+    if (Object.keys(c).length) plan[s.key] = c;
+  }
+  return plan;
+}
+
+// Live preview: send the latest draft (levels only: HDR switching makes screens flicker).
+let liveBusy = false, livePending = false;
+async function pushLive() {
+  if (!S.live) return;
+  if (liveBusy) { livePending = true; return; }
+  liveBusy = true;
+  const settings = clone(S.draft.settings);
+  for (const v of Object.values(settings)) delete v.hdr;
+  try { await api("/api/apply", { settings }); } catch (e) { toast(e.message, true); }
+  liveBusy = false;
+  if (livePending) { livePending = false; pushLive(); }
+}
+
+function edited() { markDirty(); renderEditorPreviewOnly(); pushLive(); }
+
+// ---------------------------------------------------------------- profiles tab
+
+function renderProfiles() {
+  const st = S.state;
+  const list = h("div", { class: "card list", role: "list" },
+    st.profiles.map((p) => h("button", {
+      "aria-current": S.sel === p.name ? "true" : "false",
+      "data-fk": `p:${p.name}`,
+      onclick: async () => { if (S.sel === p.name || !(await confirmLeave())) return; await stopLive(); openDraft(p.name); render(); },
+    }, h("span", { class: "name" }, p.name),
+      p.active ? h("span", { class: "badge ok", title: "Your screens match this profile" }, "✓ active") : null,
+      p.builtin && p.customized ? h("span", { class: "badge", title: "Default profile, changed by you" }, "changed") : null)),
+    h("button", { class: "new", "aria-current": S.sel === null ? "true" : "false",
+      onclick: async () => { if (!(await confirmLeave())) return; await stopLive(); openDraft(null); render(); document.getElementById("profile-name").focus(); } }, "+ New profile"));
+  return h("div", { class: "layout" }, list, h("section", { class: "card editor", id: "editor" }, editor()));
+}
+
+function editor() {
+  const d = S.draft, st = S.state;
+  const isNew = d.original === null;
+  const p = isNew ? null : profile(d.original);
+  const nameHint = () => d.builtin ? "Default profiles keep their name." : `In Flow: ${kw()} ${d.name.trim().toLowerCase().replace(/\s+/g, " ") || "<name>"}`;
+  const hint = h("span", { class: "hint", style: "padding-bottom:7px" }, nameHint());
+  const head = h("div", { class: "editor-head" },
+    h("label", { class: "field" }, "Profile name",
+      h("input", { type: "text", id: "profile-name", value: d.name, maxlength: 40, disabled: d.builtin, placeholder: "e.g. gaming",
+        "aria-describedby": "name-err",
+        oninput: (e) => { d.name = e.target.value; markDirty(); hint.textContent = nameHint(); document.getElementById("name-err").textContent = ""; } })),
+    hint, h("div", { class: "field-err", id: "name-err", role: "alert" }));
+
+  const out = [head];
+  if (isNew) out.push(h("p", { class: "hint" }, "Starts from your current settings. Turn values off to leave them unchanged when the profile is applied."));
+  if (p && p.builtin && p.customized) out.push(h("div", { class: "warn" }, "You changed this default profile. “Reset to default” brings back its original values."));
+
+  const rows = h("div", { class: "rows", id: "rows" });
+  const ids = new Set(screens().map((s) => s.id));
+  const own = screens().filter((s) => d.settings[s.id]);
+  rows.append(allRow(own.length > 0 && own.length < screens().length ? "Every other screen" : (own.length ? "Screens without their own values" : "All screens")));
+  for (const s of screens()) rows.append(screenRow(s));
+  for (const id of Object.keys(d.settings)) if (id !== "*" && !ids.has(id)) rows.append(missingRow(id));
+  out.push(rows);
+
+  out.push(h("label", { class: "switch", style: "margin-bottom:12px" },
+    h("input", { type: "checkbox", checked: S.live, onchange: async (e) => {
+      if (e.target.checked) { S.snapshot = snapshot(false); S.live = true; pushLive(); toast("Live preview on: your screens follow the sliders"); }
+      else { await stopLive(); await load(); toast("Live preview off: values restored"); }
+    } }), "Preview on my screens while editing (brightness and contrast)"));
+
+  const actions = h("div", { class: "actions" },
+    h("button", { class: "btn primary", id: "save", onclick: save, title: "Ctrl+S", disabled: !isNew && !S.dirty }, isNew ? "Create profile" : "Save"),
+    h("button", { class: "btn", onclick: useCurrent, title: "Fill every screen with its current values" }, "Use current values"),
+    h("button", { class: "btn", onclick: tryIt, title: "Apply these values now, without saving" }, "Try it"),
+    S.tried ? h("button", { class: "btn", onclick: undoTry }, "Undo try") : null,
+    h("span", { class: "dirty", id: "dirty", hidden: isNew || !S.dirty }, "Unsaved changes"),
+    h("span", { class: "spacer" }),
+    !isNew && !d.builtin ? h("button", { class: "btn", onclick: duplicate }, "Duplicate") : null,
+    !isNew && d.builtin ? h("button", { class: "btn", onclick: duplicate }, "Save a copy…") : null,
+    !isNew && (!d.builtin || (p && p.customized)) ? h("button", { class: "btn danger", onclick: remove }, d.builtin ? "Reset to default" : "Delete") : null);
+  out.push(actions);
+  return out;
+}
+
+function featureControls(values, onChange, screen) {
+  const ctrls = [];
+  for (const [key, sym, label] of FEATURES) {
+    const unavailable = screen && screen[key].error;
+    const on = values[key] != null;
+    const shown = on ? values[key] : (screen ? screen.current[key] ?? 50 : 50);
+    const val = h("span", { class: "val" }, on ? `${shown}%` : "Unchanged");
+    const range = h("input", { type: "range", min: 0, max: 100, step: 1, value: shown, disabled: !on || unavailable, "aria-label": label,
+      oninput: (e) => { values[key] = +e.target.value; val.textContent = `${values[key]}%`; onChange(); } });
+    const box = h("input", { type: "checkbox", checked: on, disabled: unavailable, "aria-label": `Set ${label.toLowerCase()}`,
+      onchange: (e) => { if (e.target.checked) values[key] = +range.value; else delete values[key];
+        range.disabled = !e.target.checked; val.textContent = e.target.checked ? `${values[key]}%` : "Unchanged";
+        wrap.classList.toggle("off", !e.target.checked); onChange(); } });
+    const wrap = h("div", { class: "control" + (on ? "" : " off"), title: unavailable ? unavailable : (on ? "" : "Left unchanged") },
+      h("label", { class: "lbl" }, box, `${sym} ${label}`), range, val);
+    ctrls.push(wrap);
+  }
+  if (!screen || screen.hdr) {
+    const state = values.hdr;
+    const seg = h("div", { class: "seg", role: "group", "aria-label": "HDR" },
+      [["Unchanged", null], ["Off", false], ["On", true]].map(([text, v]) => h("button", { "aria-pressed": state === v || (v === null && state == null) ? "true" : "false",
+        onclick: (e) => { if (v === null) delete values.hdr; else values.hdr = v;
+          for (const b of seg.children) b.setAttribute("aria-pressed", "false"); e.target.setAttribute("aria-pressed", "true"); onChange(); } }, text)));
+    ctrls.push(h("div", { class: "control" }, h("span", { class: "lbl" }, "HDR"), seg, h("span")));
+  }
+  return h("div", { class: "controls" }, ctrls);
+}
+
+function allRow(title) {
+  const d = S.draft;
+  const values = d.settings["*"] || (d.settings["*"] = {});
+  return h("div", { class: "row" },
+    h("div", { class: "row-head" }, h("span", { class: "chip all" }, "All"), h("span", { class: "title" }, title),
+      h("span", { class: "hint" }, "Also used for screens you connect later")),
+    featureControls(values, () => { if (!Object.keys(values).length) delete d.settings["*"]; else d.settings["*"] = values; edited(); }));
+}
+
+function screenRow(s) {
+  const d = S.draft;
+  const hasOwn = !!d.settings[s.id];
+  const body = h("div");
+  const row = h("div", { class: "row", "data-id": s.id },
+    h("div", { class: "row-head" }, h("span", { class: "chip", style: `background:${s.color}` }, s.number),
+      h("span", { class: "title" }, screenName(s)), h("span", { class: "hint" }, screenHint(s)),
+      h("span", { class: "spacer" }),
+      h("label", { class: "switch" }, h("input", { type: "checkbox", checked: hasOwn, "data-fk": `own:${s.id}`, onchange: (e) => {
+        if (e.target.checked) d.settings[s.id] = clone(Object.keys(effective(d.settings, s)).length ? effective(d.settings, s) : s.current);
+        else delete d.settings[s.id];
+        markDirty(); renderEditor(); pushLive();
+      } }), "Own values")),
+    body, h("div", { class: "preview", "data-preview": s.id }));
+  if (hasOwn) body.append(featureControls(d.settings[s.id], edited, s));
+  else body.append(h("div", { class: "inherit" }, "Uses the values above"));
+  return row;
+}
+
+function missingRow(id) {
+  const d = S.draft, v = d.settings[id];
+  const bits = [v.brightness != null ? `☀ ${v.brightness}%` : "", v.contrast != null ? `◑ ${v.contrast}%` : "", v.hdr != null ? `HDR ${v.hdr ? "on" : "off"}` : ""].filter(Boolean);
+  return h("div", { class: "row" }, h("div", { class: "row-head" }, h("span", { class: "chip all" }, "?"),
+    h("span", { class: "title" }, "A screen that is not connected"), h("span", { class: "hint" }, `${bits.join(" ")} · ${id}`),
+    h("span", { class: "spacer" }),
+    h("button", { class: "btn", onclick: () => { delete d.settings[id]; markDirty(); renderEditor(); } }, "Remove")));
+}
+
+function renderEditorPreviewOnly() {
+  for (const s of screens()) {
+    const el = document.querySelector(`[data-preview="${CSS.escape(s.id)}"]`);
+    if (!el) continue;
+    const bits = changesFor(S.draft.settings, s);
+    const why = cannotSet(s);
+    el.replaceChildren(bits.length ? h("span", {}, "Applying it changes ", h("b", {}, bits.join("  ·  "))) : why ? "" : "Already matches this screen",
+      why ? h("span", { class: "why" }, `Brightness and contrast can't be set here: ${why}`) : "");
+  }
+}
+// Rows are rebuilt on structural changes: keep keyboard focus on the same control.
+function keepingFocus(draw) {
+  const fk = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.fk : null;
+  draw();
+  if (fk) { const el = document.querySelector(`[data-fk="${CSS.escape(fk)}"]`); if (el) el.focus(); }
+}
+function renderEditor() { keepingFocus(() => { document.getElementById("editor").replaceChildren(...editor()); renderEditorPreviewOnly(); }); }
+
+async function save() {
+  const d = S.draft;
+  if (d.original !== null && !S.dirty) return;
+  const body = { name: d.builtin ? d.original : d.name, original: d.original, settings: d.settings };
+  try {
+    let res;
+    try { res = await api("/api/profile/save", body); }
+    catch (e) {
+      if (!/already exists/.test(e.message)) throw e;
+      if (!(await ask(`${e.message}. Replace it?`, "Replace", true))) return;
+      res = await api("/api/profile/save", { ...body, overwrite: true });
+    }
+    S.state = res.state; openDraft(res.saved); render();
+    toast(`Saved “${res.saved}” · in Flow: ${kw()} ${res.saved}`);
+  } catch (e) {
+    const err = document.getElementById("name-err");
+    if (err) err.textContent = e.message; else toast(e.message, true);
+  }
+}
+
+function useCurrent() {
+  const d = S.draft;
+  for (const s of screens()) if (Object.keys(s.current).length) d.settings[s.id] = clone(s.current);
+  markDirty(); renderEditor(); toast("Filled with your current values");
+}
+
+async function tryIt() {
+  try {
+    S.tried = snapshot(true);
+    const res = await api("/api/apply", { settings: S.draft.settings });
+    S.state = res.state; render();
+    toast(res.errors.length ? "Applied with errors:\n" + res.errors.join("\n") : "Applied (not saved)", !!res.errors.length);
+  } catch (e) { toast(e.message, true); }
+}
+async function undoTry() {
+  try { const res = await api("/api/apply", { plan: S.tried }); S.tried = null; S.state = res.state; render(); toast("Back to the previous values"); }
+  catch (e) { toast(e.message, true); }
+}
+
+function duplicate() {
+  const d = S.draft;
+  S.draft = { name: `${d.name} copy`, original: null, builtin: false, settings: clone(d.settings) };
+  S.sel = null; S.dirty = true; render(); document.getElementById("profile-name").focus();
+}
+
+async function remove() {
+  const d = S.draft;
+  const what = d.builtin ? `Reset “${d.original}” to its default values?` : `Delete the profile “${d.original}”?`;
+  if (!(await ask(what, d.builtin ? "Reset" : "Delete", true))) return;
+  try {
+    const res = await api("/api/profile/delete", { name: d.original });
+    S.state = res.state;
+    const still = profile(d.original);
+    openDraft(still ? still.name : ((S.state.profiles[0] || {}).name ?? null)); render();
+    toast(d.builtin ? `“${d.original}” is back to its defaults` : `Deleted “${d.original}”`);
+  } catch (e) { toast(e.message, true); }
+}
+
+// ---------------------------------------------------------------- screens tab
+
+const levelQueue = {};
+async function setLevel(key, feature, value) {
+  const id = key + feature;
+  if (levelQueue[id]) { levelQueue[id].next = value; return; }
+  levelQueue[id] = { next: null };
+  try { await api("/api/level", { key, feature, value }); } catch (e) { toast(e.message, true); }
+  const next = levelQueue[id].next; delete levelQueue[id];
+  if (next !== null) setLevel(key, feature, next);
+}
+
+function renderScreens() {
+  const st = S.state;
+  const bar = h("div", { class: "toolbar" },
+    h("span", { class: "hint" }, "Changes here apply at once. Nicknames follow the monitor, even on another port."),
+    h("span", { class: "spacer" }),
+    h("button", { class: "btn", onclick: async () => { await load(true); toast("Values read again from the screens"); } }, "Refresh"),
+    h("button", { class: "btn", title: "Restart monitor communication and clear caches", onclick: async () => {
+      try { S.state = (await api("/api/reset", {})).state; render(); toast("Monitor communication restarted"); } catch (e) { toast(e.message, true); }
+    } }, "Reset communication"));
+  if (!st.screens.length) return [bar, h("div", { class: "card empty" }, "Windows did not report any screen.")];
+  return [bar, h("div", { class: "screens" }, st.screens.map((s) => {
+    const nick = h("input", { type: "text", "data-fk": `nick:${s.key}`, value: s.nickname, maxlength: 40, placeholder: "Nickname, e.g. Gaming", "aria-label": `Nickname for screen ${s.number}` });
+    const saveNick = async () => {
+      try { S.state = (await api("/api/nickname", { id: s.id, name: nick.value })).state; render(); toast(nick.value.trim() ? `Screen ${s.number} is now “${nick.value.trim()}”` : `Nickname removed from screen ${s.number}`); }
+      catch (e) { toast(e.message, true); }
+    };
+    nick.addEventListener("keydown", (e) => { if (e.key === "Enter") saveNick(); });
+    const levels = cannotSet(s) ? [h("div", { class: "err" }, `Brightness and contrast: ${cannotSet(s)}`)] : FEATURES.map(([key, sym, label]) => {
+      if (s[key].error) return h("div", { class: "err" }, `${label}: ${s[key].error}`);
+      const val = h("span", { class: "val" }, `${s[key].value}%`);
+      return h("div", { class: "control" }, h("span", { class: "lbl" }, `${sym} ${label}`),
+        h("input", { type: "range", min: 0, max: 100, value: s[key].value, "aria-label": `${label} of screen ${s.number}`,
+          oninput: (e) => { val.textContent = `${e.target.value}%`; s[key].value = +e.target.value; s.current[key] = +e.target.value; setLevel(s.key, key, +e.target.value); } }), val);
+    });
+    const hdr = s.hdr ? h("div", { class: "control" }, h("span", { class: "lbl" }, "HDR"),
+      h("div", { class: "seg", role: "group", "aria-label": `HDR of screen ${s.number}` }, [["Off", false], ["On", true]].map(([text, v]) =>
+        h("button", { "aria-pressed": s.hdr.enabled === v ? "true" : "false", "data-fk": `hdr:${s.key}:${v}`, onclick: async (e) => {
+          if (s.hdr.enabled === v) return;
+          for (const b of e.target.parentElement.children) b.disabled = true;
+          toast("Switching HDR… the screen may flicker");
+          try { const res = await api("/api/apply", { plan: { [s.key]: { hdr: v } } }); S.state = res.state; render(); if (res.errors.length) toast(res.errors.join("\n"), true); }
+          catch (e) { toast(e.message, true); }
+        } }, text))), h("span")) : h("div", { class: "hint" }, "HDR not supported");
+    return h("article", { class: "card screen" },
+      h("div", { class: "head" }, h("span", { class: "chip", style: `background:${s.color}` }, s.number),
+        h("div", {}, h("div", { style: "font-weight:600" }, screenName(s)), h("div", { class: "tags" }, screenHint(s))),
+        h("span", { style: "flex:1" }),
+        h("button", { class: "btn", onclick: () => api("/api/identify", { keys: [s.key] }).catch((e) => toast(e.message, true)) }, "Identify")),
+      h("div", { class: "nick" }, nick, h("button", { class: "btn", onclick: saveNick }, "Save name")),
+      ...levels, hdr);
+  }))];
+}
+
+// ---------------------------------------------------------------- shell
+
+function render() {
+  for (const b of document.querySelectorAll("nav button")) {
+    const on = b.dataset.tab === S.tab;
+    b.setAttribute("aria-selected", on ? "true" : "false");
+    b.tabIndex = on ? 0 : -1;
+  }
+  const main = document.getElementById("main");
+  if (!S.state) return;
+  keepingFocus(() => {
+    if (S.tab === "profiles") { if (!S.draft) openDraft(S.sel ?? null); main.replaceChildren(renderProfiles()); renderEditorPreviewOnly(); }
+    else main.replaceChildren(...renderScreens());
+  });
+}
+
+for (const b of document.querySelectorAll("nav button")) b.addEventListener("click", async () => {
+  if (S.tab === b.dataset.tab) return;
+  if (b.dataset.tab !== "profiles" && S.live) { await stopLive(); }
+  S.tab = b.dataset.tab;
+  await load();
+});
+document.querySelector("nav").addEventListener("keydown", (e) => {
+  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+  const tabs = [...document.querySelectorAll("nav button")];
+  const next = tabs[(tabs.indexOf(document.activeElement) + 1) % tabs.length];
+  next.focus(); next.click();
+});
+document.getElementById("identify-all").addEventListener("click", () => api("/api/identify", {}).catch((e) => toast(e.message, true)));
+document.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "s" && S.tab === "profiles") { e.preventDefault(); save(); } });
+window.addEventListener("beforeunload", (e) => { if (S.dirty) { e.preventDefault(); e.returnValue = ""; } });
+window.addEventListener("pagehide", () => {
+  if (S.live && S.snapshot) fetch("/api/apply", { method: "POST", keepalive: true, headers: { "X-Token": token, "Content-Type": "application/json" }, body: JSON.stringify({ plan: S.snapshot }) });
+});
+setInterval(() => api("/api/ping").catch(() => {}), 10000);
+load().catch((e) => { document.getElementById("main").replaceChildren(h("div", { class: "card empty" }, e.message)); });
+</script>
+</body>
+</html>
