@@ -29,7 +29,7 @@ from collections.abc import Callable
 from ctypes import wintypes as wt
 from typing import IO, Any
 
-__all__ = ("RESTART_METHOD", "Supervisor")
+__all__ = ("RESTART_METHOD", "Supervisor", "route_query")
 
 log = logging.getLogger("screen_control.supervisor")
 
@@ -41,8 +41,38 @@ RESTART_WINDOW = 300.0
 _CREATE_NO_WINDOW = 0x08000000
 
 
+_NO_RESULTS: dict[str, Any] = {"result": [], "settingsChange": {}, "debugMessage": ""}
+
+
 def _encode(msg: dict[str, Any]) -> bytes:
     return (json.dumps(msg) + "\r\n").encode("utf-8")
+
+
+def _named_keywords(initialize: dict[str, Any]) -> list[str]:
+    try:
+        keywords = initialize["params"][0]["currentPluginMetadata"]["actionKeywords"]
+        return [k for k in keywords if isinstance(k, str) and k != "*"]
+    except (KeyError, IndexError, TypeError):
+        return []
+
+
+def route_query(msg: dict[str, Any], keywords: list[str]) -> dict[str, Any] | None:
+    """What the plugin should get for a query from Flow; None if it isn't for the plugin.
+
+    The plugin is also registered as global, so it reaches here for anything typed, "SC 50"
+    included, with no keyword. Flow's own keyword queries ("sc 50") pass through.
+    """
+    params = msg.get("params")
+    query = params[0] if isinstance(params, list) and params else None
+    if not keywords or not isinstance(query, dict) or query.get("actionKeyword"):
+        return msg
+    typed, _, rest = str(query.get("search") or "").strip().partition(" ")
+    keyword = next((k for k in keywords if k.lower() == typed.lower()), None)
+    if keyword is None:
+        return None
+    rest = rest.strip()
+    query = {**query, "actionKeyword": keyword, "search": rest, "rawQuery": f"{keyword} {rest}" if rest else keyword}
+    return {**msg, "params": [query, *params[1:]]}
 
 
 class Supervisor:
@@ -69,6 +99,7 @@ class Supervisor:
         self._pending: dict[Any, tuple[str, float]] = {}
         self._swallow: set[Any] = set()  # replayed "initialize" answers Flow must not see twice
         self._init_line: bytes | None = None
+        self._keywords: list[str] = []
         self._restarts: collections.deque[float] = collections.deque()
         self._gave_up = False
         self._stopping = False
@@ -231,9 +262,18 @@ class Supervisor:
                 # only, while the plugin keeps starting in the background. The
                 # plugin still gets the message; its own answer is swallowed.
                 self._init_line = line
+                self._keywords = _named_keywords(msg)
                 self._write_flow(_encode({"jsonrpc": "2.0", "id": rid, "result": {"hide": False}}))
                 with self._state:
                     self._swallow.add(rid)
+            if method == "query":
+                routed = route_query(msg, self._keywords)
+                if routed is None:
+                    # Anything typed in Flow: no plugin process involved, and never an error row.
+                    self._write_flow(_encode({"jsonrpc": "2.0", "id": rid, "result": _NO_RESULTS}))
+                    return
+                if routed is not msg:
+                    line = _encode(routed)
             with self._state:
                 child = self._child
                 if child is None or self._gave_up:

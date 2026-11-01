@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import itertools
 import json
 import logging
 import sys
@@ -23,19 +22,7 @@ __all__ = ("ScreenControlPlugin",)
 
 log = logging.getLogger(__name__)
 
-
-def keyword_variants(keywords: list[str]) -> list[str]:
-    """Case variants of ``keywords`` that are not registered yet."""
-    variants: list[str] = []
-    for keyword in keywords:
-        if keyword == "*":
-            continue  # no keyword: Flow sends every query
-        if len(keyword) <= 4:
-            forms = ["".join(chars) for chars in itertools.product(*((c.lower(), c.upper()) for c in keyword))]
-        else:
-            forms = [keyword.lower(), keyword.upper(), keyword.title()]
-        variants += [f for f in forms if f not in keywords and f not in variants]
-    return variants
+GLOBAL_KEYWORD = "*"
 
 
 class ScreenSearchHandler(SearchHandler["ScreenControlPlugin"]):
@@ -43,6 +30,8 @@ class ScreenSearchHandler(SearchHandler["ScreenControlPlugin"]):
 
     async def callback(self, query: Query[Any]) -> list[Result]:
         assert self.plugin is not None
+        if query.keyword in (GLOBAL_KEYWORD, "") and self.plugin._named_keywords():
+            return []  # not for us (the supervisor normally answers these)
         store = self.plugin.store
         profiles = store.profiles()
         parsed = parse_query(query.text, profiles)
@@ -155,25 +144,28 @@ class ScreenControlPlugin(Plugin):
     async def _warm_up(self) -> None:
         # Read the screens while Flow finishes starting, so the first `sc` is instant.
         self.service.warm_up()
-        await self._register_keyword_variants()
+        await self._receive_any_case()
 
-    async def _register_keyword_variants(self) -> None:
-        """Flow matches action keywords exactly: make "SC" and "sC" reach the plugin too."""
+    async def _receive_any_case(self) -> None:
+        """Flow matches keywords exactly, and lists each one it knows: registering "SC" would
+        add a row for it. The global keyword isn't listed, and the supervisor turns "SC 50"
+        into "sc 50" and answers every unrelated query by itself."""
+        if not self._named_keywords():
+            return  # already global
         try:
-            keywords = list(self.metadata.keywords or [])
-            # Flow would take a keyword away from another plugin without a word, and list
-            # one twice if a restarted plugin process registered it again.
-            taken: set[str] = set()
+            own: list[str] = []
             try:
                 plugins = await asyncio.wait_for(self.api.get_all_plugins(), 3.0)
-                taken.update(k for plugin in plugins for k in plugin.keywords or [])
+                own = next((p.keywords or [] for p in plugins if p.id == self.metadata.id), [])
             except Exception:
                 log.warning("Could not read the keywords in use", exc_info=True)
-            for keyword in keyword_variants(keywords):
-                if keyword not in taken:
-                    await asyncio.wait_for(self.api.add_keyword(self.metadata.id, keyword), 3.0)
+            if GLOBAL_KEYWORD not in own:  # a restarted plugin process has it already
+                await asyncio.wait_for(self.api.add_keyword(self.metadata.id, GLOBAL_KEYWORD), 3.0)
         except Exception:
-            log.exception("Could not register the keyword's upper-case variants")
+            log.exception("Could not register the global keyword")
+
+    def _named_keywords(self) -> list[str]:
+        return [k for k in self.metadata.keywords or [] if k != GLOBAL_KEYWORD]
 
     async def process_search_handlers(self, query: Query[Any]) -> QueryResponse | ErrorResponse:
         response = await super().process_search_handlers(query)

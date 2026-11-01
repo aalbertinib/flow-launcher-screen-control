@@ -341,31 +341,25 @@ class KeywordRegistrationTests(unittest.TestCase):
             metadata=SimpleNamespace(id="me", keywords=list(own)),
             api=SimpleNamespace(get_all_plugins=get_all_plugins, add_keyword=add_keyword),
         )
-        asyncio.run(ScreenControlPlugin._register_keyword_variants(fake))
-        return sorted(added)
+        fake._named_keywords = lambda: ScreenControlPlugin._named_keywords(fake)
+        asyncio.run(ScreenControlPlugin._receive_any_case(fake))
+        return added
 
-    def test_keywords_of_other_plugins_stay_theirs(self) -> None:
-        others = [SimpleNamespace(keywords=["SC", "x"]), SimpleNamespace(keywords=None)]
-        self.assertEqual(self._register(others), ["Sc", "sC"])
+    def test_only_the_hidden_keyword_is_added(self) -> None:
+        self.assertEqual(self._register([SimpleNamespace(id="me", keywords=["sc"])]), ["*"])
 
     def test_a_restart_does_not_register_twice(self) -> None:
-        self.assertEqual(self._register([SimpleNamespace(keywords=["sc", "SC", "Sc", "sC"])]), [])
+        self.assertEqual(self._register([SimpleNamespace(id="me", keywords=["sc", "*"])]), [])
 
     def test_still_registers_if_flow_cannot_say(self) -> None:
-        self.assertEqual(self._register(RuntimeError("no")), ["SC", "Sc", "sC"])
+        self.assertEqual(self._register(RuntimeError("no")), ["*"])
+
+    def test_a_global_only_plugin_changes_nothing(self) -> None:
+        self.assertEqual(self._register([], own=("*",)), [])
 
 
 class CaseTests(unittest.TestCase):
     MIXED = {**DEFAULT_PROFILES, "Gaming": {"*": {"brightness": 90}}, "gaming": {"*": {"brightness": 40}}}
-
-    def test_keyword_variants(self) -> None:
-        from screen_control.plugin import keyword_variants
-
-        self.assertEqual(sorted(keyword_variants(["sc"])), ["SC", "Sc", "sC"])
-        self.assertEqual(keyword_variants(["sc", "SC", "Sc", "sC"]), [])
-        self.assertEqual(keyword_variants(["*"]), [])
-        self.assertEqual(keyword_variants(["12"]), [])  # no letters: nothing to vary
-        self.assertEqual(sorted(keyword_variants(["screen"])), ["SCREEN", "Screen"])  # long: common forms only
 
     def test_commands_ignore_case(self) -> None:
         self.assertIs(parse_query("HDR OFF").action, Action.HDR)

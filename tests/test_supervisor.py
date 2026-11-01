@@ -3,6 +3,7 @@ or cannot start, and Flow must always get an answer."""
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import queue
@@ -195,6 +196,62 @@ class SupervisorTests(unittest.TestCase):
         flow.close()
         child.wait(timeout=5)
         self.assertIsNotNone(child.returncode)
+
+
+class RouteQueryTests(unittest.TestCase):
+    @staticmethod
+    def _query(search: str, keyword: str = "") -> dict:
+        raw = f"{keyword} {search}".strip()
+        return {"id": 1, "method": "query", "params": [{"search": search, "rawQuery": raw, "actionKeyword": keyword}, {}]}
+
+    def test_any_case_becomes_the_real_keyword(self) -> None:
+        for typed in ("SC", "sC", "Sc"):
+            for rest, raw in (("", "sc"), ("hdr  off", "sc hdr  off"), ("50", "sc 50")):
+                query = sup.route_query(self._query(f"{typed} {rest}".strip()), ["sc"])["params"][0]
+                self.assertEqual((query["actionKeyword"], query["search"], query["rawQuery"]), ("sc", rest, raw))
+
+    def test_profile_names_keep_their_case(self) -> None:
+        self.assertEqual(sup.route_query(self._query("SC Gaming"), ["sc"])["params"][0]["search"], "Gaming")
+
+    def test_other_searches_are_not_for_the_plugin(self) -> None:
+        for text in ("", "chrome", "scr", "SCREEN 50", "s c"):
+            self.assertIsNone(sup.route_query(self._query(text), ["sc"]), text)
+
+    def test_keyword_queries_and_odd_messages_pass_through(self) -> None:
+        msg = self._query("50", "sc")
+        self.assertIs(sup.route_query(msg, ["sc"]), msg)
+        for odd in ({"id": 1}, {"id": 1, "params": []}, {"id": 1, "params": ["x"]}):
+            self.assertIs(sup.route_query(odd, ["sc"]), odd)
+        global_only = self._query("chrome")
+        self.assertIs(sup.route_query(global_only, []), global_only)
+
+    def _supervisor(self) -> tuple[sup.Supervisor, io.BytesIO]:
+        out = io.BytesIO()
+        s = sup.Supervisor(["unused"], io.BytesIO(), out)
+        s._keywords = ["sc"]
+        return s, out
+
+    def test_unrelated_searches_are_answered_empty_even_while_restarting(self) -> None:
+        s, out = self._supervisor()
+        s._gave_up = True
+        s._from_flow(json.dumps(self._query("chrome")).encode())
+        self.assertEqual(json.loads(out.getvalue())["result"]["result"], [])
+
+    def test_the_plugin_gets_the_rewritten_query(self) -> None:
+        s, out = self._supervisor()
+        s._child = object()
+        with mock.patch.object(sup.Supervisor, "_write_child", return_value=True) as write:
+            s._from_flow(json.dumps(self._query("SC 50")).encode())
+        sent = json.loads(write.call_args.args[1])["params"][0]
+        self.assertEqual((sent["actionKeyword"], sent["search"], sent["rawQuery"]), ("sc", "50", "sc 50"))
+        self.assertEqual(out.getvalue(), b"")
+
+    def test_initialize_gives_the_keywords(self) -> None:
+        s, _ = self._supervisor()
+        s._start_child = lambda: True
+        params = [{"currentPluginMetadata": {"actionKeywords": ["sc", "*"]}}]
+        s._from_flow(json.dumps({"id": 1, "method": "initialize", "params": params}).encode())
+        self.assertEqual(s._keywords, ["sc"])
 
 
 if __name__ == "__main__":
