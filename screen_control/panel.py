@@ -19,7 +19,9 @@ import asyncio
 import hmac
 import json
 import logging
+import math
 import os
+import re
 import secrets
 import subprocess
 import threading
@@ -59,7 +61,7 @@ class PanelError(Exception):
 
 
 def _level(value: Any) -> int:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
         raise PanelError("Values must be numbers from 0 to 100")
     return max(0, min(100, round(value)))
 
@@ -232,7 +234,7 @@ class _Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A002 - stdlib signature
-        log.debug("panel: " + format, *args)
+        log.debug("panel: %s", re.sub(r"([?&]t=)[^&\s]+", r"\1(hidden)", format % args))
 
     # -- checks ------------------------------------------------------------
 
@@ -240,7 +242,10 @@ class _Handler(BaseHTTPRequestHandler):
         panel = self.server.panel
         if self.headers.get("Host") != panel.host:
             return False  # a web page reaching 127.0.0.1 through its own domain name
-        return token is not None and hmac.compare_digest(token, panel.token)
+        if token is None or not hmac.compare_digest(token.encode("utf-8", "replace"), panel.token.encode()):
+            return False
+        panel.touch()  # only the page itself keeps the panel open
+        return True
 
     def _send(self, status: int, body: bytes, content_type: str) -> None:
         self.send_response(status)
@@ -264,7 +269,6 @@ class _Handler(BaseHTTPRequestHandler):
     # -- requests ----------------------------------------------------------
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib name
-        self.server.panel.touch()
         url = urlsplit(self.path)
         if url.path == "/":
             token = (parse_qs(url.query).get("t") or [None])[0]
@@ -285,7 +289,6 @@ class _Handler(BaseHTTPRequestHandler):
             self._json(404, {"error": "Not found"})
 
     def do_POST(self) -> None:  # noqa: N802 - stdlib name
-        self.server.panel.touch()
         if not self._allowed(self.headers.get("X-Token")):
             self._json(403, {"error": "This panel has expired: open it again from Flow (sc settings)"})
             return
@@ -296,9 +299,13 @@ class _Handler(BaseHTTPRequestHandler):
         if not (self.headers.get("Content-Type") or "").startswith("application/json"):
             self._json(415, {"error": "Expected JSON"})
             return
-        length = int(self.headers.get("Content-Length") or 0)
-        if length > MAX_BODY:
-            self._json(413, {"error": "Request too large"})
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = -1
+        if not 0 <= length <= MAX_BODY:
+            self.close_connection = True  # the body was not read
+            self._json(413 if length > 0 else 400, {"error": "Request too large" if length > 0 else "Invalid request"})
             return
         try:
             body = json.loads(self.rfile.read(length) or b"{}")

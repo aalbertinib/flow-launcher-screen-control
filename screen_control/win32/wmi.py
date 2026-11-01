@@ -8,6 +8,7 @@ and only used when an internal panel is actually present.
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 
 from .common import Win32Error
@@ -20,10 +21,17 @@ _TIMEOUT = 10
 _CREATE_NO_WINDOW = 0x08000000
 
 
+def _powershell_exe() -> str:
+    """By full path: a bare name is also searched for in Python's and the current folder."""
+    system_root = os.environ.get("SystemRoot")
+    path = os.path.join(system_root or "", "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
+    return path if system_root and os.path.isfile(path) else "powershell.exe"
+
+
 def _powershell(script: str) -> str:
     try:
         proc = subprocess.run(
-            ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script],
+            [_powershell_exe(), "-NoProfile", "-NonInteractive", "-Command", script],
             capture_output=True,
             text=True,
             timeout=_TIMEOUT,

@@ -6,13 +6,15 @@ import asyncio
 import base64
 import http.client
 import json
+import logging
+import socket
 import tempfile
 import threading
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from screen_control.panel import PAGE, PanelApi, PanelError, PanelServer, clean_settings
+from screen_control.panel import MAX_BODY, PAGE, PanelApi, PanelError, PanelServer, clean_settings
 from screen_control.query_parser import Action, parse_query
 from screen_control.store import DEFAULT_PROFILES, Store
 
@@ -49,7 +51,8 @@ class CleanSettingsTests(unittest.TestCase):
         self.assertEqual(clean_settings(raw), {"*": {"brightness": 100, "hdr": False}, "id1": {"contrast": 50}})
 
     def test_rejects_bad_input(self) -> None:
-        for raw in ([], {"*": 5}, {"*": {"brightness": "50"}}, {"*": {"hdr": 1}}, {"*": {"brightness": True}}):
+        nan = float("nan")
+        for raw in ([], {"*": 5}, {"*": {"brightness": "50"}}, {"*": {"hdr": 1}}, {"*": {"brightness": True}}, {"*": {"contrast": nan}}):
             with self.assertRaises(PanelError, msg=raw):
                 clean_settings(raw)
 
@@ -182,6 +185,37 @@ class ServerTests(unittest.TestCase):
         status, body = self.request("POST", "/api/profile/save", {"name": "work", "settings": {"*": {"brightness": 61}}}, self.auth())
         self.assertEqual(status, 200, body)
         self.assertEqual(self.plugin.store.profiles()["work"], {"*": {"brightness": 61}})
+
+    def test_only_the_page_keeps_the_panel_open(self) -> None:
+        self.panel._last_request = 1.0
+        self.assertEqual(self.request("GET", "/api/ping")[0], 403)
+        self.assertEqual(self.request("POST", "/api/reset", {})[0], 403)
+        self.assertEqual(self.request("GET", "/?t=wrong")[0], 403)
+        self.assertEqual(self.panel._last_request, 1.0)
+        self.assertEqual(self.request("GET", "/api/ping", headers=self.auth())[0], 200)
+        self.assertGreater(self.panel._last_request, 1.0)
+
+    def test_odd_tokens_are_refused_cleanly(self) -> None:
+        self.assertEqual(self.request("GET", "/?t=%C3%A9t%C3%A9")[0], 403)
+        self.assertEqual(self.request("GET", "/api/ping", headers={"X-Token": "é"})[0], 403)
+
+    def test_bad_lengths_are_refused(self) -> None:
+        for length, expected in (("-1", 400), ("abc", 400), (str(MAX_BODY + 1), 413)):
+            with self.subTest(length=length), socket.create_connection(("127.0.0.1", self.port), timeout=5) as sock:
+                sock.sendall(
+                    f"POST /api/reset HTTP/1.1\r\nHost: {self.panel.host}\r\nX-Token: {self.panel.token}\r\n"
+                    f"Content-Type: application/json\r\nContent-Length: {length}\r\n\r\n".encode()
+                )
+                answer = b"".join(iter(lambda: sock.recv(4096), b""))  # and the server closes
+                self.assertIn(f" {expected} ".encode(), answer.split(b"\r\n")[0])
+
+    def test_the_token_stays_out_of_the_log(self) -> None:
+        self.addCleanup(logging.disable, logging.root.manager.disable)
+        logging.disable(logging.NOTSET)
+        with self.assertLogs("screen_control.panel", "DEBUG") as logs:
+            self.request("GET", f"/?t={self.panel.token}")
+        self.assertNotIn(self.panel.token, "\n".join(logs.output))
+        self.assertIn("t=(hidden)", "\n".join(logs.output))
 
     def test_a_new_start_changes_the_token(self) -> None:
         old = self.panel.token
