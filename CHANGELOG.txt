@@ -1,3 +1,8 @@
+v1.2.2
+
+- Flow's keyword list shows ScreenControl once (sc), not once per upper and lower case variant.
+  SC, Sc and sC keep working; other searches are answered at once without reaching the plugin
+
 v1.2.1
 
 - Keyword and commands ignore case: SC, Sc, sC, SC HDR OFF, sc C 40...
