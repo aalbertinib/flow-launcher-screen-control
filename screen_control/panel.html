@@ -580,6 +580,7 @@ document.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && e.
 window.addEventListener("beforeunload", (e) => { if (S.dirty) { e.preventDefault(); e.returnValue = ""; } });
 window.addEventListener("pagehide", () => {
   if (S.live && S.snapshot) fetch("/api/apply", { method: "POST", keepalive: true, headers: { "X-Token": token, "Content-Type": "application/json" }, body: JSON.stringify({ plan: S.snapshot }) });
+  fetch("/api/closing", { method: "POST", keepalive: true, headers: { "X-Token": token } });
 });
 setInterval(() => api("/api/ping").catch(() => {}), 10000);
 load().catch((e) => { document.getElementById("main").replaceChildren(h("div", { class: "card empty" }, e.message)); });

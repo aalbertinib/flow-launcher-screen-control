@@ -224,7 +224,7 @@ Nicknames can also be used to pick a screen: `sc gaming 40`.
 - Values are re-read in the background every 30 seconds, so the list opens instantly. After
   changing a setting with the monitor's own buttons, the next keystroke shows the new value.
 - Nicknames and profiles are stored in
-  `%APPDATA%\FlowLauncher\Settings\Plugins\ScreenControl\screen_control.json` and survive updates.
+  `%APPDATA%\FlowLauncher\Settings\Plugins\ScreenControl\screen_control.json` and survive updates. A backup, `screen_control.bak.json`, sits next to it: to start over, delete both while Flow is closed.
 - Laptop built-in screens use Windows' brightness control (no contrast). This path has not
   been tested on real hardware yet.
 - The plugin never goes online, and nothing leaves this computer.

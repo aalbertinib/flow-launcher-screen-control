@@ -10,10 +10,12 @@ import copy
 import json
 import logging
 import math
+import msvcrt
 import os
 import shutil
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +32,8 @@ DEFAULT_PROFILES: dict[str, dict[str, dict[str, Any]]] = {
 }
 _FILE_NAME = "screen_control.json"
 _BACKUP_NAME = "screen_control.bak.json"
+_LOCK_NAME = "screen_control.lock"
+_WRITER_WAIT = 2.0  # seconds
 _LOCK_RETRIES = 10
 _LOCK_WAIT = 0.05
 _TEMP_FILE_AGE = 60  # seconds: newer ones may be another process saving
@@ -111,6 +115,39 @@ class Store:
                     tmp.unlink()
             except OSError:
                 pass
+
+    @contextmanager
+    def _changing(self) -> Iterator[None]:
+        """One process at a time reads the latest data, changes it and saves it.
+
+        Windows drops the lock if a process dies. A change is never refused for lack of it.
+        """
+        fd = None
+        locked = False
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            fd = os.open(self.path.with_name(_LOCK_NAME), os.O_RDWR | os.O_CREAT)
+            deadline = time.monotonic() + _WRITER_WAIT
+            while not locked:
+                try:
+                    msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                    locked = True
+                except OSError:
+                    if time.monotonic() > deadline:
+                        log.warning("Another process keeps %s locked, saving anyway", _LOCK_NAME)
+                        break
+                    time.sleep(_LOCK_WAIT)
+        except OSError:
+            log.exception("Could not lock %s", _LOCK_NAME)
+        try:
+            self._refresh()
+            yield
+        finally:
+            if fd is not None:
+                if locked:
+                    os.lseek(fd, 0, os.SEEK_SET)
+                    msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+                os.close(fd)
 
     def _read(self, path: Path) -> dict[str, Any]:
         raw = json.loads(_patiently(lambda: path.read_text(encoding="utf-8")))
@@ -200,13 +237,13 @@ class Store:
         return self._data["nicknames"].get(identity)
 
     def set_nickname(self, identity: str, name: str | None) -> None:
-        self._refresh()
         name = " ".join((name or "").split())[:_MAX_NAME]
-        if name:
-            self._data["nicknames"][identity] = name
-        else:
-            self._data["nicknames"].pop(identity, None)
-        self._save()
+        with self._changing():
+            if name:
+                self._data["nicknames"][identity] = name
+            else:
+                self._data["nicknames"].pop(identity, None)
+            self._save()
 
     # -- profiles ----------------------------------------------------------
 
@@ -218,16 +255,16 @@ class Store:
         return merged
 
     def save_profile(self, name: str, settings: dict[str, dict[str, Any]]) -> None:
-        self._refresh()
-        self._data["profiles"][normalize_profile_name(name)] = settings
-        self._save()
+        with self._changing():
+            self._data["profiles"][normalize_profile_name(name)] = settings
+            self._save()
 
     def delete_profile(self, name: str) -> bool:
         """Remove a custom profile or reset a built-in one. True if anything changed."""
-        self._refresh()
-        removed = self._data["profiles"].pop(normalize_profile_name(name), None) is not None
-        if removed:
-            self._save()
+        with self._changing():
+            removed = self._data["profiles"].pop(normalize_profile_name(name), None) is not None
+            if removed:
+                self._save()
         return removed
 
     def is_customized(self, name: str) -> bool:

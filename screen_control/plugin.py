@@ -161,8 +161,17 @@ class ScreenControlPlugin(Plugin):
         """Flow matches action keywords exactly: make "SC" and "sC" reach the plugin too."""
         try:
             keywords = list(self.metadata.keywords or [])
+            # Flow would take a keyword away from another plugin without a word, and list
+            # one twice if a restarted plugin process registered it again.
+            taken: set[str] = set()
+            try:
+                plugins = await asyncio.wait_for(self.api.get_all_plugins(), 3.0)
+                taken.update(k for plugin in plugins for k in plugin.keywords or [])
+            except Exception:
+                log.warning("Could not read the keywords in use", exc_info=True)
             for keyword in keyword_variants(keywords):
-                await asyncio.wait_for(self.api.add_keyword(self.metadata.id, keyword), 3.0)
+                if keyword not in taken:
+                    await asyncio.wait_for(self.api.add_keyword(self.metadata.id, keyword), 3.0)
         except Exception:
             log.exception("Could not register the keyword's upper-case variants")
 

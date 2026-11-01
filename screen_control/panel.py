@@ -49,8 +49,11 @@ __all__ = ("PanelApi", "PanelError", "PanelServer")
 log = logging.getLogger(__name__)
 
 PAGE = Path(__file__).with_name("panel.html")
-IDLE_STOP = 60.0
-"""Seconds without a request before the server stops (the page pings every 10 s)."""
+IDLE_STOP = 300.0
+"""Seconds without a request before the server stops. The page pings every 10 s, but
+browsers slow the timers of hidden windows to about once a minute."""
+CLOSE_GRACE = 15.0
+"""The same once the page said it was closing (long enough for a reload to come back)."""
 CALL_TIMEOUT = 30.0
 MAX_BODY = 64 * 1024
 WINDOW_SIZE = "1020,780"
@@ -292,6 +295,10 @@ class _Handler(BaseHTTPRequestHandler):
         if not self._allowed(self.headers.get("X-Token")):
             self._json(403, {"error": "This panel has expired: open it again from Flow (sc settings)"})
             return
+        if urlsplit(self.path).path == "/api/closing":
+            self.server.panel.closing()
+            self._json(200, {})
+            return
         method = _ROUTES.get(urlsplit(self.path).path)
         if method is None:
             self._json(404, {"error": "Not found"})
@@ -348,6 +355,7 @@ class PanelServer:
         self.host = ""
         self._server: _Server | None = None
         self._last_request = 0.0
+        self._idle_stop = IDLE_STOP
         self._lock = threading.Lock()
 
     @property
@@ -360,6 +368,10 @@ class PanelServer:
 
     def touch(self) -> None:
         self._last_request = time.monotonic()
+        self._idle_stop = IDLE_STOP
+
+    def closing(self) -> None:
+        self._idle_stop = CLOSE_GRACE
 
     def start(self, loop: asyncio.AbstractEventLoop) -> str:
         """Start serving (if needed) and return the panel's address."""
@@ -385,7 +397,7 @@ class PanelServer:
     def _stop_when_idle(self, server: _Server) -> None:
         while self._server is server:
             time.sleep(5)
-            if time.monotonic() - self._last_request > IDLE_STOP:
+            if time.monotonic() - self._last_request > self._idle_stop:
                 log.info("Settings panel closed, stopping its server")
                 self.stop()
 

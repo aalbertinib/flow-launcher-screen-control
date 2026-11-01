@@ -323,6 +323,38 @@ class ActionFeedbackTests(unittest.TestCase):
             self.assertIsNone(plugin.store.nickname(SCREENS[1].stable_id))
 
 
+class KeywordRegistrationTests(unittest.TestCase):
+    def _register(self, plugins, own=("sc",)):  # noqa: ANN001, ANN202
+        from screen_control.plugin import ScreenControlPlugin
+
+        added: list[str] = []
+
+        async def get_all_plugins():  # noqa: ANN202
+            if isinstance(plugins, Exception):
+                raise plugins
+            return plugins
+
+        async def add_keyword(_id: str, keyword: str) -> None:
+            added.append(keyword)
+
+        fake = SimpleNamespace(
+            metadata=SimpleNamespace(id="me", keywords=list(own)),
+            api=SimpleNamespace(get_all_plugins=get_all_plugins, add_keyword=add_keyword),
+        )
+        asyncio.run(ScreenControlPlugin._register_keyword_variants(fake))
+        return sorted(added)
+
+    def test_keywords_of_other_plugins_stay_theirs(self) -> None:
+        others = [SimpleNamespace(keywords=["SC", "x"]), SimpleNamespace(keywords=None)]
+        self.assertEqual(self._register(others), ["Sc", "sC"])
+
+    def test_a_restart_does_not_register_twice(self) -> None:
+        self.assertEqual(self._register([SimpleNamespace(keywords=["sc", "SC", "Sc", "sC"])]), [])
+
+    def test_still_registers_if_flow_cannot_say(self) -> None:
+        self.assertEqual(self._register(RuntimeError("no")), ["SC", "Sc", "sC"])
+
+
 class CaseTests(unittest.TestCase):
     MIXED = {**DEFAULT_PROFILES, "Gaming": {"*": {"brightness": 90}}, "gaming": {"*": {"brightness": 40}}}
 

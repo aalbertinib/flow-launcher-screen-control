@@ -14,7 +14,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from screen_control.panel import MAX_BODY, PAGE, PanelApi, PanelError, PanelServer, clean_settings
+from screen_control.panel import CLOSE_GRACE, IDLE_STOP, MAX_BODY, PAGE, PanelApi, PanelError, PanelServer, clean_settings
 from screen_control.query_parser import Action, parse_query
 from screen_control.store import DEFAULT_PROFILES, Store
 
@@ -216,6 +216,16 @@ class ServerTests(unittest.TestCase):
             self.request("GET", f"/?t={self.panel.token}")
         self.assertNotIn(self.panel.token, "\n".join(logs.output))
         self.assertIn("t=(hidden)", "\n".join(logs.output))
+
+    def test_a_hidden_window_keeps_the_panel_and_closing_ends_it_soon(self) -> None:
+        self.assertGreater(IDLE_STOP, 120)  # hidden windows may only ping once a minute
+        self.assertEqual(self.request("POST", "/api/closing")[0], 403)
+        self.assertEqual(self.panel._idle_stop, IDLE_STOP)
+        status, _ = self.request("POST", "/api/closing", headers=self.auth())
+        self.assertEqual(status, 200)
+        self.assertEqual(self.panel._idle_stop, CLOSE_GRACE)
+        self.request("GET", "/api/ping", headers=self.auth())  # a reload came back
+        self.assertEqual(self.panel._idle_stop, IDLE_STOP)
 
     def test_a_new_start_changes_the_token(self) -> None:
         old = self.panel.token

@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import enum
 import logging
+import os
 import threading
 import time
 from collections.abc import Callable, Sequence
@@ -32,6 +33,7 @@ DDC_FAILURE_TTL = 60.0
 """Seconds to skip a monitor whose DDC/CI did not answer (failed reads are slow)."""
 READ_TIMEOUT = 10.0
 STUCK_AFTER = 20.0
+MAX_STUCK_THREADS = 16
 """A hardware call running longer than this is abandoned and the workers replaced."""
 KEEP_FRESH_EVERY = 30.0
 """Background refresh interval: DDC/CI reads cost ~60 ms each and Windows runs
@@ -580,6 +582,12 @@ class ScreenService:
         if busy is not None and time.monotonic() - busy > STUCK_AFTER:
             log.error("A hardware call has been stuck for %.0f s: replacing the workers", time.monotonic() - busy)
             self.reset(clear_cache=False)
+            stuck = sum(t.name.startswith("screen-") for t in threading.enumerate())
+            if stuck > MAX_STUCK_THREADS:
+                # They can't be stopped from here. The supervisor starts a clean process.
+                log.critical("%s threads are stuck in hardware calls, restarting the plugin", stuck)
+                logging.shutdown()
+                os._exit(1)
 
     def reset(self, clear_cache: bool = True) -> None:
         """Start over: fresh worker threads, monitor handles and failure memory.

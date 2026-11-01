@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from dataclasses import replace
@@ -196,6 +198,29 @@ class StoreTests(unittest.TestCase):
             saved = json.loads(path.read_text(encoding="utf-8"))["profiles"]
             self.assertEqual(saved["Text"], "oops")
             self.assertEqual(saved["Broken"]["a"], 5)
+
+    def test_two_processes_saving_lose_nothing(self) -> None:
+        code = (
+            "import sys; sys.path.insert(0, '.'); from pathlib import Path; from screen_control.store import Store;"
+            "s = Store(Path(sys.argv[1]));"
+            "[s.set_nickname(f'{sys.argv[2]}{i}', 'x') for i in range(40)]"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            writers = [subprocess.Popen([sys.executable, "-c", code, tmp, name], cwd=Path(__file__).parent.parent) for name in "ab"]
+            self.assertEqual([w.wait(60) for w in writers], [0, 0])
+            store = Store(Path(tmp))
+            for name in "ab":
+                for i in range(40):
+                    self.assertEqual(store.nickname(f"{name}{i}"), "x", f"{name}{i}")
+
+    def test_a_lock_held_too_long_does_not_stop_a_save(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Store(Path(tmp))
+            with mock.patch("screen_control.store.msvcrt.locking", side_effect=OSError("held")), mock.patch(
+                "screen_control.store._WRITER_WAIT", 0
+            ):
+                store.set_nickname("A", "Desk")
+            self.assertEqual(Store(Path(tmp)).nickname("A"), "Desk")
 
     def test_a_newer_versions_data_is_kept(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
