@@ -141,6 +141,28 @@ class ResetCommandTests(unittest.TestCase):
         self.assertIn("Enter: reset", row.sub or "")
 
 
+class StuckThreadLimitTests(unittest.TestCase):
+    def _recover(self, threads: int) -> mock.Mock:
+        async def scenario() -> None:
+            service = screens_mod.ScreenService()
+            service._busy_since = -1e9
+            service._recover_if_stuck()
+            service.close()
+
+        fake = [threading.Thread(name=f"screen-io_{i}") for i in range(threads)]
+        with mock.patch.object(screens_mod.threading, "enumerate", return_value=fake), mock.patch.object(
+            screens_mod.os, "_exit"
+        ) as leave, mock.patch.object(screens_mod.logging, "shutdown"):
+            asyncio.run(scenario())
+        return leave
+
+    def test_a_few_stuck_threads_are_tolerated(self) -> None:
+        self.assertFalse(self._recover(screens_mod.MAX_STUCK_THREADS).called)
+
+    def test_too_many_restart_the_process(self) -> None:
+        self._recover(screens_mod.MAX_STUCK_THREADS + 1).assert_called_once_with(1)
+
+
 if __name__ == "__main__":
     unittest.main()
 

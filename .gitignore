@@ -22,6 +22,8 @@ debug.flag
 data/
 screen_control.json
 *.bad.json
+*.bak.json
+*.lock
 *.tmp
 
 # Secrets and local configuration

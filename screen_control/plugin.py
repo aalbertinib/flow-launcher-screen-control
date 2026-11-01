@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import itertools
 import json
 import logging
 import sys
@@ -21,6 +22,20 @@ from .win32 import Win32Error
 __all__ = ("ScreenControlPlugin",)
 
 log = logging.getLogger(__name__)
+
+
+def keyword_variants(keywords: list[str]) -> list[str]:
+    """Case variants of ``keywords`` that are not registered yet."""
+    variants: list[str] = []
+    for keyword in keywords:
+        if keyword == "*":
+            continue  # no keyword: Flow sends every query
+        if len(keyword) <= 4:
+            forms = ["".join(chars) for chars in itertools.product(*((c.lower(), c.upper()) for c in keyword))]
+        else:
+            forms = [keyword.lower(), keyword.upper(), keyword.title()]
+        variants += [f for f in forms if f not in keywords and f not in variants]
+    return variants
 
 
 class ScreenSearchHandler(SearchHandler["ScreenControlPlugin"]):
@@ -140,6 +155,25 @@ class ScreenControlPlugin(Plugin):
     async def _warm_up(self) -> None:
         # Read the screens while Flow finishes starting, so the first `sc` is instant.
         self.service.warm_up()
+        await self._register_keyword_variants()
+
+    async def _register_keyword_variants(self) -> None:
+        """Flow matches action keywords exactly: make "SC" and "sC" reach the plugin too."""
+        try:
+            keywords = list(self.metadata.keywords or [])
+            # Flow would take a keyword away from another plugin without a word, and list
+            # one twice if a restarted plugin process registered it again.
+            taken: set[str] = set()
+            try:
+                plugins = await asyncio.wait_for(self.api.get_all_plugins(), 3.0)
+                taken.update(k for plugin in plugins for k in plugin.keywords or [])
+            except Exception:
+                log.warning("Could not read the keywords in use", exc_info=True)
+            for keyword in keyword_variants(keywords):
+                if keyword not in taken:
+                    await asyncio.wait_for(self.api.add_keyword(self.metadata.id, keyword), 3.0)
+        except Exception:
+            log.exception("Could not register the keyword's upper-case variants")
 
     async def process_search_handlers(self, query: Query[Any]) -> QueryResponse | ErrorResponse:
         response = await super().process_search_handlers(query)

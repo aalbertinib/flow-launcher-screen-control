@@ -40,7 +40,7 @@ class CustomProfileParseTests(unittest.TestCase):
     def test_own_profiles_by_exact_name(self) -> None:
         q = parse_query("gaming", CUSTOM)
         self.assertEqual((q.action, q.profile_name, q.profile_op), (Action.PROFILE, "gaming", "apply"))
-        q = parse_query("Gaming Night save", CUSTOM)
+        q = parse_query("gaming night save", CUSTOM)
         self.assertEqual((q.profile_name, q.profile_op), ("gaming night", "save"))
         self.assertEqual(parse_query("gaming delete", CUSTOM).profile_op, "delete")
 
@@ -66,7 +66,7 @@ class ShortCommandTests(unittest.TestCase):
 
     def test_short_words_with_the_rest_of_the_command(self) -> None:
         q = parse_query("p save Gaming")
-        self.assertEqual((q.action, q.profile_op, q.profile_name), (Action.PROFILE, "save", "gaming"))
+        self.assertEqual((q.action, q.profile_op, q.profile_name), (Action.PROFILE, "save", "Gaming"))
         self.assertEqual(parse_query("ni save").profile_op, "save")
         q = parse_query("p sa gaming")
         self.assertEqual((q.profile_op, q.profile_name), ("save", "gaming"))
@@ -321,6 +321,85 @@ class ActionFeedbackTests(unittest.TestCase):
             self.assertEqual(plugin.feedback.query, "sc ")
             _run(UndoResult(), plugin)
             self.assertIsNone(plugin.store.nickname(SCREENS[1].stable_id))
+
+
+class KeywordRegistrationTests(unittest.TestCase):
+    def _register(self, plugins, own=("sc",)):  # noqa: ANN001, ANN202
+        from screen_control.plugin import ScreenControlPlugin
+
+        added: list[str] = []
+
+        async def get_all_plugins():  # noqa: ANN202
+            if isinstance(plugins, Exception):
+                raise plugins
+            return plugins
+
+        async def add_keyword(_id: str, keyword: str) -> None:
+            added.append(keyword)
+
+        fake = SimpleNamespace(
+            metadata=SimpleNamespace(id="me", keywords=list(own)),
+            api=SimpleNamespace(get_all_plugins=get_all_plugins, add_keyword=add_keyword),
+        )
+        asyncio.run(ScreenControlPlugin._register_keyword_variants(fake))
+        return sorted(added)
+
+    def test_keywords_of_other_plugins_stay_theirs(self) -> None:
+        others = [SimpleNamespace(keywords=["SC", "x"]), SimpleNamespace(keywords=None)]
+        self.assertEqual(self._register(others), ["Sc", "sC"])
+
+    def test_a_restart_does_not_register_twice(self) -> None:
+        self.assertEqual(self._register([SimpleNamespace(keywords=["sc", "SC", "Sc", "sC"])]), [])
+
+    def test_still_registers_if_flow_cannot_say(self) -> None:
+        self.assertEqual(self._register(RuntimeError("no")), ["SC", "Sc", "sC"])
+
+
+class CaseTests(unittest.TestCase):
+    MIXED = {**DEFAULT_PROFILES, "Gaming": {"*": {"brightness": 90}}, "gaming": {"*": {"brightness": 40}}}
+
+    def test_keyword_variants(self) -> None:
+        from screen_control.plugin import keyword_variants
+
+        self.assertEqual(sorted(keyword_variants(["sc"])), ["SC", "Sc", "sC"])
+        self.assertEqual(keyword_variants(["sc", "SC", "Sc", "sC"]), [])
+        self.assertEqual(keyword_variants(["*"]), [])
+        self.assertEqual(keyword_variants(["12"]), [])  # no letters: nothing to vary
+        self.assertEqual(sorted(keyword_variants(["screen"])), ["SCREEN", "Screen"])  # long: common forms only
+
+    def test_commands_ignore_case(self) -> None:
+        self.assertIs(parse_query("HDR OFF").action, Action.HDR)
+        self.assertEqual(parse_query("C 40").feature, parse_query("c 40").feature)
+        self.assertIs(parse_query("RESET").action, Action.RESET)
+        self.assertIs(parse_query("SeTTings").action, Action.SETTINGS)
+        self.assertIs(parse_query("ID").action, Action.IDENTIFY)
+        self.assertIs(parse_query("P").action, Action.PROFILE)
+        self.assertEqual(parse_query("LG 30").filters, ["lg"])
+        q = parse_query("PROFILE SAVE Gaming")
+        self.assertEqual((q.action, q.profile_op, q.profile_name), (Action.PROFILE, "save", "Gaming"))
+
+    def test_profile_names_are_case_sensitive(self) -> None:
+        self.assertEqual(parse_query("Gaming", self.MIXED).profile_name, "Gaming")
+        self.assertEqual(parse_query("gaming", self.MIXED).profile_name, "gaming")
+        self.assertIsNone(parse_query("GAMING", self.MIXED).profile_name)
+        self.assertEqual(parse_query("night").profile_name, "night")
+        self.assertIsNone(parse_query("NIGHT").profile_name)  # built-in names too
+        self.assertIsNone(parse_query("Nig").profile_name)
+        q = parse_query("gaming SAVE", self.MIXED)  # the command word still ignores case
+        self.assertEqual((q.profile_name, q.profile_op), ("gaming", "save"))
+
+    def test_completion_respects_case(self) -> None:
+        self.assertEqual([r.title for r in rows("Gam", self.MIXED)][:1], ["sc Gaming"])
+        self.assertEqual([r.title for r in rows("gam", self.MIXED)][:1], ["sc gaming"])
+        self.assertNotIn("sc night", [r.title for r in rows("NIG", self.MIXED)])
+
+    def test_a_capitalised_name_is_its_own_profile(self) -> None:
+        from screen_control.query_parser import profile_name_problem
+
+        self.assertIsNone(profile_name_problem("Gaming"))
+        self.assertIsNone(profile_name_problem("Night"))
+        self.assertIsNotNone(profile_name_problem("HDR"))  # a command, whatever its case
+        self.assertIsNotNone(profile_name_problem("Reset"))
 
 
 if __name__ == "__main__":

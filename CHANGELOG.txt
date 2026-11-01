@@ -1,3 +1,17 @@
+v1.2.1
+
+- Keyword and commands ignore case: SC, Sc, sC, SC HDR OFF, sc C 40...
+- Profile names are case-sensitive and keep their capitals: Gaming and gaming are two profiles
+- Nicknames and profiles are safer: written to disk at once with a backup that is used if the file is damaged;
+  a file locked for a moment (antivirus, backup) no longer resets them; a restarted plugin never overwrites newer data
+- A profile edited by hand with a wrong value no longer breaks the list: that value is ignored and stays in the file
+- Settings panel: stricter request checks; its access token never reaches the debug log.
+  It stays available while minimized and still stops soon after its window is closed
+- The SC, Sc and sC keywords no longer take a keyword away from another plugin
+- Two running copies of the plugin can't overwrite each other's changes
+- If hardware calls stay stuck, the plugin restarts itself instead of piling up threads
+- Built-in display brightness: PowerShell is started by full path, without changing its execution policy
+
 v1.2.0
 
 - Short commands: any letters that fit a single command work (sc p, sc s, sc r, sc ni, sc p save gaming);

@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import json
+import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from dataclasses import replace
 from pathlib import Path
+from unittest import mock
 
 from screen_control.query_parser import Action, parse_query
 from screen_control.results import profile_plan
@@ -57,7 +62,7 @@ class ProfileTests(unittest.TestCase):
         q = parse_query("night save")
         self.assertEqual((q.profile_name, q.profile_op), ("night", "save"))
         q = parse_query("profile save Gaming Setup")
-        self.assertEqual((q.profile_name, q.profile_op), ("gaming setup", "save"))
+        self.assertEqual((q.profile_name, q.profile_op), ("Gaming Setup", "save"))
         q = parse_query("profile")
         self.assertEqual((q.profile_name, q.profile_op), (None, "apply"))
         self.assertEqual(parse_query("profile reset night").profile_op, "delete")
@@ -93,6 +98,138 @@ class ProfileTests(unittest.TestCase):
 
 
 class StoreTests(unittest.TestCase):
+    def test_a_damaged_file_falls_back_on_the_backup(self) -> None:
+        for damage in ("{not json", "", "[]"):
+            with self.subTest(damage=damage), tempfile.TemporaryDirectory() as tmp:
+                store = Store(Path(tmp))
+                store.save_profile("Gaming", {"*": {"brightness": 90}})
+                store.save_profile("Work", {"*": {"brightness": 60}})
+                (Path(tmp) / "screen_control.json").write_text(damage, encoding="utf-8")
+
+                again = Store(Path(tmp))
+                self.assertIn("Gaming", again.profiles())
+                self.assertEqual(again.backup.exists(), True)
+                self.assertIn("Gaming", json.loads(again.path.read_text(encoding="utf-8"))["profiles"])
+
+    def test_a_crash_before_the_file_is_back_keeps_the_settings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Store(Path(tmp))
+            store.set_nickname("A", "Desk")
+            store.set_nickname("B", "Side")
+            store.path.unlink()
+            self.assertEqual(Store(Path(tmp)).nickname("A"), "Desk")
+
+    def test_another_process_is_never_overwritten(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            old, new = Store(Path(tmp)), Store(Path(tmp))
+            new.save_profile("Gaming", {"*": {"brightness": 90}})
+            old.set_nickname("A", "Desk")  # still running, started before that save
+            self.assertIn("Gaming", old.profiles())
+            again = Store(Path(tmp))
+            self.assertIn("Gaming", again.profiles())
+            self.assertEqual(again.nickname("A"), "Desk")
+            self.assertEqual(new.nickname("A"), "Desk")  # picked up without a restart
+
+    def test_a_locked_file_is_not_treated_as_lost(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Store(Path(tmp))
+            store.save_profile("Gaming", {"*": {"brightness": 90}})
+            before = store.path.read_text(encoding="utf-8")
+            with mock.patch("screen_control.store.time.sleep"), mock.patch.object(
+                Path, "read_text", side_effect=PermissionError("locked")
+            ):
+                locked = Store(Path(tmp))  # starts anyway
+                self.assertEqual(locked.profiles(), DEFAULT_PROFILES)
+                with self.assertRaises(OSError):  # refuses to save over data it can't see
+                    locked.set_nickname("A", "Desk")
+            self.assertEqual(store.path.read_text(encoding="utf-8"), before)
+            self.assertFalse(store.path.with_suffix(".bad.json").exists())
+            self.assertIn("Gaming", locked.profiles())  # back once the lock is gone
+
+    def test_a_short_lock_is_waited_out(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Store(Path(tmp))
+            store.set_nickname("A", "Desk")
+            real, calls = os.replace, []
+
+            def locked_once(*args):  # noqa: ANN002, ANN202
+                calls.append(args)
+                if len(calls) == 1:
+                    raise PermissionError("locked")
+                return real(*args)
+
+            with mock.patch("screen_control.store.os.replace", locked_once), mock.patch("screen_control.store.time.sleep"):
+                store.set_nickname("B", "Side")
+            self.assertEqual(Store(Path(tmp)).nickname("B"), "Side")
+
+    def test_temp_files_left_by_a_crash_are_removed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            old, recent = Path(tmp) / "screen_control.1.tmp", Path(tmp) / "screen_control.2.tmp"
+            old.write_text("x", encoding="utf-8")
+            recent.write_text("x", encoding="utf-8")
+            os.utime(old, (1, 1))
+            Store(Path(tmp))
+            self.assertFalse(old.exists())
+            self.assertTrue(recent.exists())
+
+    def test_bad_profile_values_are_ignored_but_kept(self) -> None:
+        bad = {
+            "*": {"brightness": "x", "contrast": 150, "hdr": "yes"},
+            "a": 5,
+            "b": None,
+            "c": {"brightness": True, "contrast": float("nan")},
+            "d": {"brightness": 49.6, "hdr": False, "other": 1},
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "screen_control.json"
+            path.write_text(json.dumps({"profiles": {"Broken": bad, "Text": "oops", "Good": {"*": {"brightness": 5}}}}), encoding="utf-8")
+            store = Store(Path(tmp))
+            profiles = store.profiles()
+            self.assertEqual(
+                profiles["Broken"], {"*": {"contrast": 100}, "c": {}, "d": {"brightness": 50, "hdr": False}}
+            )
+            self.assertEqual(profiles["Text"], {})
+            self.assertEqual(profiles["Good"], {"*": {"brightness": 5}})
+            for text in ("", "p", "Broken", "Text"):  # the list keeps working
+                build_results(parse_query(text, profiles), SCREENS, "sc", profiles, frozenset(profiles), None)
+            profile_plan(profiles["Broken"], SCREENS)
+
+            store.set_nickname("A", "Desk")  # saving leaves them for the user to fix
+            saved = json.loads(path.read_text(encoding="utf-8"))["profiles"]
+            self.assertEqual(saved["Text"], "oops")
+            self.assertEqual(saved["Broken"]["a"], 5)
+
+    def test_two_processes_saving_lose_nothing(self) -> None:
+        code = (
+            "import sys; sys.path.insert(0, '.'); from pathlib import Path; from screen_control.store import Store;"
+            "s = Store(Path(sys.argv[1]));"
+            "[s.set_nickname(f'{sys.argv[2]}{i}', 'x') for i in range(40)]"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            writers = [subprocess.Popen([sys.executable, "-c", code, tmp, name], cwd=Path(__file__).parent.parent) for name in "ab"]
+            self.assertEqual([w.wait(60) for w in writers], [0, 0])
+            store = Store(Path(tmp))
+            for name in "ab":
+                for i in range(40):
+                    self.assertEqual(store.nickname(f"{name}{i}"), "x", f"{name}{i}")
+
+    def test_a_lock_held_too_long_does_not_stop_a_save(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Store(Path(tmp))
+            with mock.patch("screen_control.store.msvcrt.locking", side_effect=OSError("held")), mock.patch(
+                "screen_control.store._WRITER_WAIT", 0
+            ):
+                store.set_nickname("A", "Desk")
+            self.assertEqual(Store(Path(tmp)).nickname("A"), "Desk")
+
+    def test_a_newer_versions_data_is_kept(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "screen_control.json").write_text('{"version": 2, "future": [1]}', encoding="utf-8")
+            store = Store(Path(tmp))
+            store.set_nickname("A", "Desk")
+            saved = json.loads(store.path.read_text(encoding="utf-8"))
+            self.assertEqual((saved["version"], saved["future"]), (2, [1]))
+
     def test_round_trip_and_corruption(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             store = Store(Path(tmp))
@@ -102,7 +239,7 @@ class StoreTests(unittest.TestCase):
 
             again = Store(Path(tmp))
             self.assertEqual(again.nickname("GSM5D24#123456"), "Gaming Desk")
-            self.assertEqual(again.profiles()["gaming"], {"*": {"brightness": 90}})
+            self.assertEqual(again.profiles()["Gaming"], {"*": {"brightness": 90}})
             self.assertEqual(again.profiles()["night"], {"*": {"brightness": 5}})
             self.assertTrue(again.is_customized("night"))
 
@@ -112,6 +249,7 @@ class StoreTests(unittest.TestCase):
             self.assertIsNone(again.nickname("GSM5D24#123456"))
 
             (Path(tmp) / "screen_control.json").write_text("{not json", encoding="utf-8")
+            (Path(tmp) / "screen_control.bak.json").unlink()
             broken = Store(Path(tmp))  # must not raise
             self.assertEqual(broken.profiles(), DEFAULT_PROFILES)
             self.assertTrue((Path(tmp) / "screen_control.bad.json").exists())

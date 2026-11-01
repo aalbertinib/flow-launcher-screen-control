@@ -19,7 +19,9 @@ import asyncio
 import hmac
 import json
 import logging
+import math
 import os
+import re
 import secrets
 import subprocess
 import threading
@@ -47,8 +49,11 @@ __all__ = ("PanelApi", "PanelError", "PanelServer")
 log = logging.getLogger(__name__)
 
 PAGE = Path(__file__).with_name("panel.html")
-IDLE_STOP = 60.0
-"""Seconds without a request before the server stops (the page pings every 10 s)."""
+IDLE_STOP = 300.0
+"""Seconds without a request before the server stops. The page pings every 10 s, but
+browsers slow the timers of hidden windows to about once a minute."""
+CLOSE_GRACE = 15.0
+"""The same once the page said it was closing (long enough for a reload to come back)."""
 CALL_TIMEOUT = 30.0
 MAX_BODY = 64 * 1024
 WINDOW_SIZE = "1020,780"
@@ -59,7 +64,7 @@ class PanelError(Exception):
 
 
 def _level(value: Any) -> int:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
         raise PanelError("Values must be numbers from 0 to 100")
     return max(0, min(100, round(value)))
 
@@ -232,7 +237,7 @@ class _Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A002 - stdlib signature
-        log.debug("panel: " + format, *args)
+        log.debug("panel: %s", re.sub(r"([?&]t=)[^&\s]+", r"\1(hidden)", format % args))
 
     # -- checks ------------------------------------------------------------
 
@@ -240,7 +245,10 @@ class _Handler(BaseHTTPRequestHandler):
         panel = self.server.panel
         if self.headers.get("Host") != panel.host:
             return False  # a web page reaching 127.0.0.1 through its own domain name
-        return token is not None and hmac.compare_digest(token, panel.token)
+        if token is None or not hmac.compare_digest(token.encode("utf-8", "replace"), panel.token.encode()):
+            return False
+        panel.touch()  # only the page itself keeps the panel open
+        return True
 
     def _send(self, status: int, body: bytes, content_type: str) -> None:
         self.send_response(status)
@@ -264,7 +272,6 @@ class _Handler(BaseHTTPRequestHandler):
     # -- requests ----------------------------------------------------------
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib name
-        self.server.panel.touch()
         url = urlsplit(self.path)
         if url.path == "/":
             token = (parse_qs(url.query).get("t") or [None])[0]
@@ -285,9 +292,12 @@ class _Handler(BaseHTTPRequestHandler):
             self._json(404, {"error": "Not found"})
 
     def do_POST(self) -> None:  # noqa: N802 - stdlib name
-        self.server.panel.touch()
         if not self._allowed(self.headers.get("X-Token")):
             self._json(403, {"error": "This panel has expired: open it again from Flow (sc settings)"})
+            return
+        if urlsplit(self.path).path == "/api/closing":
+            self.server.panel.closing()
+            self._json(200, {})
             return
         method = _ROUTES.get(urlsplit(self.path).path)
         if method is None:
@@ -296,9 +306,13 @@ class _Handler(BaseHTTPRequestHandler):
         if not (self.headers.get("Content-Type") or "").startswith("application/json"):
             self._json(415, {"error": "Expected JSON"})
             return
-        length = int(self.headers.get("Content-Length") or 0)
-        if length > MAX_BODY:
-            self._json(413, {"error": "Request too large"})
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = -1
+        if not 0 <= length <= MAX_BODY:
+            self.close_connection = True  # the body was not read
+            self._json(413 if length > 0 else 400, {"error": "Request too large" if length > 0 else "Invalid request"})
             return
         try:
             body = json.loads(self.rfile.read(length) or b"{}")
@@ -341,6 +355,7 @@ class PanelServer:
         self.host = ""
         self._server: _Server | None = None
         self._last_request = 0.0
+        self._idle_stop = IDLE_STOP
         self._lock = threading.Lock()
 
     @property
@@ -353,6 +368,10 @@ class PanelServer:
 
     def touch(self) -> None:
         self._last_request = time.monotonic()
+        self._idle_stop = IDLE_STOP
+
+    def closing(self) -> None:
+        self._idle_stop = CLOSE_GRACE
 
     def start(self, loop: asyncio.AbstractEventLoop) -> str:
         """Start serving (if needed) and return the panel's address."""
@@ -378,7 +397,7 @@ class PanelServer:
     def _stop_when_idle(self, server: _Server) -> None:
         while self._server is server:
             time.sleep(5)
-            if time.monotonic() - self._last_request > IDLE_STOP:
+            if time.monotonic() - self._last_request > self._idle_stop:
                 log.info("Settings panel closed, stopping its server")
                 self.stop()
 

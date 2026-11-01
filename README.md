@@ -46,7 +46,7 @@ pm install ScreenControl
 Install a specific release straight from Flow ([all releases](https://github.com/aalbertinib/flow-launcher-screen-control/releases)):
 
 ```
-pm install https://github.com/aalbertinib/flow-launcher-screen-control/releases/download/v1.2.0/Flow.Launcher.Plugin.ScreenControl.zip
+pm install https://github.com/aalbertinib/flow-launcher-screen-control/releases/download/v1.2.1/Flow.Launcher.Plugin.ScreenControl.zip
 ```
 
 Or by hand: extract the release zip into `%APPDATA%\FlowLauncher\Plugins\ScreenControl`
@@ -75,7 +75,8 @@ yourself, or `--hotkey "Ctrl+Alt+F9"` for another shortcut (`--hotkey none` for 
 
 ## Usage guide
 
-Everything starts with `sc`. Words can be typed in any order, and `sc ?` lists every
+Everything starts with `sc`. Words can be typed in any order and in any case (`SC HDR OFF`,
+`sc C 40`); only profile names are case-sensitive. `sc ?` lists every
 command with an example. Commands can be shortened to the letters that fit only one of them: `sc p` for profiles,
 `sc s` for settings, `sc r` for reset, `sc ni` for night, `sc p save gaming`. When several fit
 (`sc n`: name or night), it suggests them; a screen those letters could mean (`sc r`: right) is
@@ -165,7 +166,8 @@ A profile sets brightness, contrast and HDR on every screen in one go.
 
 Saved profiles remember each screen separately. Profile names complete as you type
 (`sc gam` → `sc gaming`, `sc profile save g` offers to replace "gaming"), and names that
-already mean something (`hdr`, `50`, `#2`...) are refused.
+already mean something (`hdr`, `50`, `#2`...) are refused. Names are case-sensitive: `Gaming`
+and `gaming` are two profiles, and `sc Night` is not the `night` profile.
 
 ### Undo
 
@@ -222,7 +224,7 @@ Nicknames can also be used to pick a screen: `sc gaming 40`.
 - Values are re-read in the background every 30 seconds, so the list opens instantly. After
   changing a setting with the monitor's own buttons, the next keystroke shows the new value.
 - Nicknames and profiles are stored in
-  `%APPDATA%\FlowLauncher\Settings\Plugins\ScreenControl\screen_control.json` and survive updates.
+  `%APPDATA%\FlowLauncher\Settings\Plugins\ScreenControl\screen_control.json` and survive updates. A backup, `screen_control.bak.json`, sits next to it: to start over, delete both while Flow is closed.
 - Laptop built-in screens use Windows' brightness control (no contrast). This path has not
   been tested on real hardware yet.
 - The plugin never goes online, and nothing leaves this computer.
