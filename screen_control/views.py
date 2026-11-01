@@ -126,7 +126,7 @@ def _suggest(b: _Builder, partial: str, profiles: dict[str, dict], screens: list
                 auto_complete_text=b.q(n),
             )
         )
-    matches = [(word, what) for word, what in _COMPLETIONS if word.startswith(partial) and word.strip() != partial]
+    matches = [(word, what) for word, what in _COMPLETIONS if word.startswith(partial.lower()) and word.strip() != partial.lower()]
     for word, what in matches:
         b.add(ChangeQueryResult(b.q(word), title=f"sc {word.strip()}", sub=f"{what} · Enter or Tab to complete",
                                 icon=ICON_APP, auto_complete_text=b.q(word)))
@@ -156,7 +156,7 @@ def _select(
     for word in parsed.filters:
         selected = [s for s in selected if word in s.search_text]
     if not selected:
-        if _suggest(b, " ".join(parsed.filters), profiles, screens):
+        if _suggest(b, " ".join(parsed.typed_filters), profiles, screens):
             return None  # a command word or profile name being typed, not a screen name
         names = " · ".join(s.title for s in screens)
         b.error(f"No screen matches “{' '.join(parsed.filters)}”", f"Connected: {names}")

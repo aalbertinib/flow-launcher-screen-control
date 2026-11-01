@@ -310,7 +310,7 @@ function editor() {
   const d = S.draft, st = S.state;
   const isNew = d.original === null;
   const p = isNew ? null : profile(d.original);
-  const nameHint = () => d.builtin ? "Default profiles keep their name." : `In Flow: ${kw()} ${d.name.trim().toLowerCase().replace(/\s+/g, " ") || "<name>"}`;
+  const nameHint = () => d.builtin ? "Default profiles keep their name." : `In Flow: ${kw()} ${d.name.trim().replace(/\s+/g, " ") || "<name>"}`;
   const hint = h("span", { class: "hint", style: "padding-bottom:7px" }, nameHint());
   const head = h("div", { class: "editor-head" },
     h("label", { class: "field" }, "Profile name",

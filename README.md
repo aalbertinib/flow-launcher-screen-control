@@ -75,7 +75,8 @@ yourself, or `--hotkey "Ctrl+Alt+F9"` for another shortcut (`--hotkey none` for 
 
 ## Usage guide
 
-Everything starts with `sc`. Words can be typed in any order, and `sc ?` lists every
+Everything starts with `sc`. Words can be typed in any order and in any case (`SC HDR OFF`,
+`sc C 40`); only profile names are case-sensitive. `sc ?` lists every
 command with an example. Commands can be shortened to the letters that fit only one of them: `sc p` for profiles,
 `sc s` for settings, `sc r` for reset, `sc ni` for night, `sc p save gaming`. When several fit
 (`sc n`: name or night), it suggests them; a screen those letters could mean (`sc r`: right) is
@@ -165,7 +166,8 @@ A profile sets brightness, contrast and HDR on every screen in one go.
 
 Saved profiles remember each screen separately. Profile names complete as you type
 (`sc gam` → `sc gaming`, `sc profile save g` offers to replace "gaming"), and names that
-already mean something (`hdr`, `50`, `#2`...) are refused.
+already mean something (`hdr`, `50`, `#2`...) are refused. Names are case-sensitive: `Gaming`
+and `gaming` are two profiles, and `sc Night` is not the `night` profile.
 
 ### Undo
 

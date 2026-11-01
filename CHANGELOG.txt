@@ -1,3 +1,8 @@
+Unreleased
+
+- Keyword and commands ignore case: SC, Sc, sC, SC HDR OFF, sc C 40...
+- Profile names are case-sensitive and keep their capitals: Gaming and gaming are two profiles
+
 v1.2.0
 
 - Short commands: any letters that fit a single command work (sc p, sc s, sc r, sc ni, sc p save gaming);

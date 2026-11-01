@@ -161,7 +161,7 @@ def _save_sub(name: str, profiles: dict[str, dict], screens: list[Screen]) -> st
 def _shadows_screen(name: str, screens: list[Screen]) -> Screen | None:
     """A screen that ``sc <name>`` used to pick, before the profile takes the word."""
     words = name.split()
-    return next((s for s in screens if all(w in s.search_text.split() for w in words)), None)
+    return next((s for s in screens if all(w.lower() in s.search_text.split() for w in words)), None)
 
 
 def _deletable(profiles: dict[str, dict], customized: frozenset[str]) -> list[str]:

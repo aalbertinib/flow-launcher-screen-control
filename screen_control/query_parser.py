@@ -62,6 +62,8 @@ class ParsedQuery:
     hdr_mode: HdrMode | None = None
     screen_number: int | None = None
     filters: list[str] = field(default_factory=list)
+    typed_filters: list[str] = field(default_factory=list)
+    """The same words as typed: profile names are case-sensitive."""
     error: str | None = None
     nickname: str | None = None
     """For NAME: the new name, original capitalisation ("" means remove)."""
@@ -146,15 +148,21 @@ _COMMANDS = ("name", "profile", "reset", "settings", "help", "day", "night", "mo
 _OTHER_WORDS = ("brightness", "contrast", "hdr", "identify")
 
 
-def _shortened(token: str, profile_names: frozenset[str]) -> str | None:
-    """The one command ``token`` starts, None if it is complete or fits several."""
-    fits = [w for w in (*_COMMANDS, *_OTHER_WORDS, *profile_names) if w.startswith(token)]
+def _shortened(typed: str, profile_names: frozenset[str]) -> str | None:
+    """The one command ``typed`` starts, None if it is complete or fits several.
+
+    Command words ignore case; profile names, built-in ones included, don't.
+    """
+    token = typed.lower()
+    commands = [w for w in (*_COMMANDS, *_OTHER_WORDS) if w not in BUILTIN_PROFILES and w.startswith(token)]
+    profiles = [n for n in (*BUILTIN_PROFILES, *profile_names) if n.startswith(typed)]
+    fits = commands + profiles
     return fits[0] if len(fits) == 1 and fits[0] != token and fits[0] in _COMMANDS else None
 
 
 def _expand_command(raw: list[str], low: list[str], profile_names: frozenset[str]) -> str | None:
     """Replace a shortened first word by its command; returns the letters it replaced."""
-    word = _shortened(low[0], profile_names)
+    word = _shortened(raw[0], profile_names)
     if word is None:
         return None
     rest = low[1:]
@@ -193,11 +201,11 @@ def _parse_command(raw: list[str], low: list[str], profile_names: frozenset[str]
 
     # gaming  /  gaming setup save: the user's own profiles, by their exact name
     # (profile_name_problem keeps saved names from clashing with commands).
-    joined = " ".join(low)
+    joined = " ".join(raw)
     if joined in profile_names:
         return ParsedQuery(action=Action.PROFILE, profile_name=joined)
-    if len(low) > 1 and low[-1] in _PROFILE_OPS and " ".join(low[:-1]) in profile_names:
-        return ParsedQuery(action=Action.PROFILE, profile_name=" ".join(low[:-1]), profile_op=_PROFILE_OPS[low[-1]])
+    if len(low) > 1 and low[-1] in _PROFILE_OPS and " ".join(raw[:-1]) in profile_names:
+        return ParsedQuery(action=Action.PROFILE, profile_name=" ".join(raw[:-1]), profile_op=_PROFILE_OPS[low[-1]])
 
     # name #2 My Desk  /  #2 name My Desk
     name_at = next((i for i in (0, 1) if i < len(low) and low[i] in NAME_WORDS), None)
@@ -216,22 +224,23 @@ def _parse_command(raw: list[str], low: list[str], profile_names: frozenset[str]
         return q
 
     # profile [save|delete] [name]  /  night [save]
-    if low[0] in PROFILE_WORDS or low[0] in BUILTIN_PROFILES:
+    if low[0] in PROFILE_WORDS or raw[0] in BUILTIN_PROFILES:
         q = ParsedQuery(action=Action.PROFILE)
-        rest = low[1:] if low[0] in PROFILE_WORDS else low
+        start = 1 if low[0] in PROFILE_WORDS else 0
+        rest, names = low[start:], raw[start:]  # names keep their case
         if rest and rest[0] in _PROFILE_OPS:
             q.profile_op = _PROFILE_OPS[rest[0]]
-            rest = rest[1:]
+            names = names[1:]
         elif len(rest) > 1 and rest[1] in _PROFILE_OPS:  # "night save"
             q.profile_op = _PROFILE_OPS[rest[1]]
-            rest = rest[:1] + rest[2:]
-        elif rest and low[0] in PROFILE_WORDS and not any(n.startswith(rest[0]) for n in BUILTIN_PROFILES | profile_names):
+            names = names[:1] + names[2:]
+        elif rest and low[0] in PROFILE_WORDS and not any(n.startswith(names[0]) for n in BUILTIN_PROFILES | profile_names):
             # "p sa gaming": short for save, unless a profile starts with those letters.
             ops = {op for word, op in _PROFILE_OPS.items() if word.startswith(rest[0])}
             if len(ops) == 1:
                 q.profile_op = ops.pop()
-                rest = rest[1:]
-        q.profile_name = " ".join(rest) or None
+                names = names[1:]
+        q.profile_name = " ".join(names) or None
         return q
     return None
 
@@ -246,7 +255,7 @@ def parse_query(text: str, profile_names: Iterable[str] = ()) -> ParsedQuery:
     setting: str | None = None
     hdr_pending = False
 
-    for token in text.lower().split():
+    for token, typed in zip(text.lower().split(), text.split()):
         if token in ("all", "*", "everywhere"):
             continue
         if token in ("windows", "win", "system", "global"):
@@ -292,6 +301,7 @@ def parse_query(text: str, profile_names: Iterable[str] = ()) -> ParsedQuery:
             continue
 
         q.filters.append(token)
+        q.typed_filters.append(typed)
 
     if setting == "help":
         q.action = Action.HELP
@@ -315,6 +325,6 @@ def profile_name_problem(name: str) -> str | None:
     words = name.split()
     if not words:
         return "Type a profile name"
-    if q.action is Action.OVERVIEW and q.screen_number is None and q.error is None and q.filters == words:
+    if q.action is Action.OVERVIEW and q.screen_number is None and q.error is None and q.filters == [w.lower() for w in words]:
         return None
     return f"“{name}” is already a ScreenControl command: pick another name"

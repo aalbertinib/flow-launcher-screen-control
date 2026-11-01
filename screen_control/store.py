@@ -139,4 +139,4 @@ class Store:
 
 
 def normalize_profile_name(name: str) -> str:
-    return " ".join(name.lower().split())[:_MAX_NAME]
+    return " ".join(name.split())[:_MAX_NAME]

@@ -57,7 +57,7 @@ class ProfileTests(unittest.TestCase):
         q = parse_query("night save")
         self.assertEqual((q.profile_name, q.profile_op), ("night", "save"))
         q = parse_query("profile save Gaming Setup")
-        self.assertEqual((q.profile_name, q.profile_op), ("gaming setup", "save"))
+        self.assertEqual((q.profile_name, q.profile_op), ("Gaming Setup", "save"))
         q = parse_query("profile")
         self.assertEqual((q.profile_name, q.profile_op), (None, "apply"))
         self.assertEqual(parse_query("profile reset night").profile_op, "delete")
@@ -102,7 +102,7 @@ class StoreTests(unittest.TestCase):
 
             again = Store(Path(tmp))
             self.assertEqual(again.nickname("GSM5D24#123456"), "Gaming Desk")
-            self.assertEqual(again.profiles()["gaming"], {"*": {"brightness": 90}})
+            self.assertEqual(again.profiles()["Gaming"], {"*": {"brightness": 90}})
             self.assertEqual(again.profiles()["night"], {"*": {"brightness": 5}})
             self.assertTrue(again.is_customized("night"))
 
